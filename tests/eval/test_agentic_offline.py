@@ -174,14 +174,16 @@ def test_code_graded_retrieval_and_summary():
         Verdict(False, True, "wrong", 1000, 100),
     )
     assert good.retrieval_correct and not wrong.retrieval_correct
-    s = summarize([good, wrong], "claude-haiku-5-5", "claude-opus-5-5")
-    assert (s.cases, s.searched, s.retrieval_correct, s.judge_correct, s.hallucinated) == (
-        2,
-        1.0,
-        0.5,
-        0.5,
+    never_searched = CaseOutcome(sample_run(tool_calls=[]), Verdict(False, False, "no search"))
+    assert not never_searched.retrieval_correct  # "nothing fits" without looking is not a hit
+    s = summarize([good, wrong, never_searched], "claude-haiku-5-5", "claude-opus-5-5")
+    assert (s.cases, s.searched, s.retrieval_correct, s.retrieval_when_searched) == (
+        3,
+        2 / 3,
+        1 / 3,
         0.5,
     )
+    assert (s.judge_correct, s.hallucinated) == (1 / 3, 1 / 3)
     assert s.cost_usd > 0
 
 

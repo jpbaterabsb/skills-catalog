@@ -138,8 +138,9 @@ class CaseOutcome:
 
     @property
     def retrieval_correct(self) -> bool:
-        """Code-graded: the first search put the expected skill first (or found nothing)."""
-        return self.run.first_search_top == self.run.expected
+        """Code-graded: the agent searched, and its first search put the expected skill first
+        (or, when nothing fits, found nothing). Not searching is never a correct retrieval."""
+        return self.run.searched and self.run.first_search_top == self.run.expected
 
 
 # --- agent loop ------------------------------------------------------------------------------
@@ -292,6 +293,7 @@ class Summary:
     cases: int
     searched: float
     retrieval_correct: float
+    retrieval_when_searched: float
     judge_correct: float
     hallucinated: float
     avg_tool_calls: float
@@ -309,6 +311,10 @@ def summarize(outcomes: list[CaseOutcome], agent_model: str, judge_model: str) -
         cases=n,
         searched=sum(o.run.searched for o in outcomes) / n,
         retrieval_correct=sum(o.retrieval_correct for o in outcomes) / n,
+        retrieval_when_searched=(
+            sum(o.retrieval_correct for o in outcomes)
+            / max(1, sum(o.run.searched for o in outcomes))
+        ),
         judge_correct=sum(o.verdict.correct for o in outcomes) / n,
         hallucinated=sum(o.verdict.hallucinated for o in outcomes) / n,
         avg_tool_calls=sum(len(o.run.tool_calls) for o in outcomes) / n,
@@ -402,6 +408,7 @@ def main() -> None:
     print(
         f"| First search ranked the right skill first (code-graded) | {s.retrieval_correct:.0%} |"
     )
+    print(f"| Same, counting only needs where it searched | {s.retrieval_when_searched:.0%} |")
     print(f"| Final answer correct (LLM judge) | {s.judge_correct:.0%} |")
     print(f"| Final answer hallucinated a skill or capability (LLM judge) | {s.hallucinated:.0%} |")
     print(f"| Tool calls per need (mean) | {s.avg_tool_calls:.1f} |")
