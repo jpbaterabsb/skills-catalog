@@ -14,8 +14,17 @@ def service(tmp_path):
 
 
 @pytest.fixture
-def catalog_client(tmp_path):
-    """A CatalogClient talking to an in-process API (no network)."""
-    app = create_app(tmp_path / "api-data")
-    with CatalogClient("http://testserver", http=TestClient(app)) as client:
+def api_app(tmp_path):
+    return create_app(tmp_path / "api-data")
+
+
+@pytest.fixture
+def make_client(api_app):
+    """Factory of CatalogClients talking to the in-process API (no network)."""
+    return lambda: CatalogClient("http://testserver", http=TestClient(api_app))
+
+
+@pytest.fixture
+def catalog_client(make_client):
+    with make_client() as client:
         yield client
