@@ -16,10 +16,23 @@ DEFAULT_LIMIT = 5
 MAX_LIMIT = 20
 _WORD = re.compile(r"\w+")
 
+# Function words and conversational filler. With OR semantics, a single "the" or "our" matches
+# almost every description, so a sentence passed verbatim would never return "no match". Found by
+# the discovery eval (tests/eval): with sentences passed verbatim, "no match" was never returned;
+# dropping these fixes that for needs that share only function words with the catalog.
+STOPWORDS = frozenset(
+    """
+    a about after all also am an and any are as at be been before but by can could did do does
+    for from had has have help how i if in into is it its just me my need no not of on or our
+    please should so some than that the their them then there these they this those to too us
+    was we were what when where which while who why will with would you your want
+    """.split()  # noqa: SIM905 - a word block reads better than 80 quoted strings
+)
+
 
 def to_fts_query(query: str) -> str:
-    """Turn free text into an FTS5 query: each word quoted as a literal, OR-ed together."""
-    tokens = [t for t in _WORD.findall(query.lower()) if t]
+    """Turn free text into an FTS5 query: content words quoted as literals, OR-ed together."""
+    tokens = dict.fromkeys(t for t in _WORD.findall(query.lower()) if t not in STOPWORDS)
     return " OR ".join(f'"{t}"' for t in tokens)
 
 

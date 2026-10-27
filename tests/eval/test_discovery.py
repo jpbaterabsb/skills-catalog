@@ -29,3 +29,9 @@ def test_verbatim_sentences_still_find_the_skill_in_the_top_3(catalog):
     report = run_discovery(catalog, "need")
     assert report.hit_at_3 >= 0.94
     assert report.hit_at_1 >= 0.88
+
+
+def test_verbatim_sentences_mostly_return_no_match_when_nothing_fits(catalog):
+    # 2 of 3: "PDF invoices for our customers" shares "customer" with customer-bug-report, a
+    # genuine lexical overlap that only semantic search (or the assistant) can rule out.
+    assert run_discovery(catalog, "need").no_match_accuracy >= 0.66

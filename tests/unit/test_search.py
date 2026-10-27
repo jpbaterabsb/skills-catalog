@@ -69,3 +69,17 @@ def test_results_do_not_include_bodies(catalog):
 
 def test_fts_query_quotes_every_token():
     assert to_fts_query('Release-notes: "v2" (draft)*') == '"release" OR "notes" OR "v2" OR "draft"'
+
+
+def test_function_words_are_dropped_and_tokens_deduplicated():
+    assert to_fts_query("Help me with the release notes for our release") == (
+        '"release" OR "notes"'
+    )
+
+
+def test_a_query_of_only_function_words_matches_nothing(catalog):
+    assert catalog.search("can you help me with this") == []
+
+
+def test_unrelated_sentence_returns_no_match(catalog):
+    assert catalog.search("Help me with our Kubernetes Helm charts.") == []
