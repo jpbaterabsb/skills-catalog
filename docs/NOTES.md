@@ -79,6 +79,23 @@ plan. Each entry says why.
 - **422 shape.** Malformed request bodies use the same `{"errors": [...]}` shape as validation
   failures, so clients handle a single format.
 
+## Two-developer demo
+
+- **Separate workspaces, not separate clones.** `scripts/two-devs.sh` gives Alice and Bob their
+  own folders, each with an `.mcp.json` that runs this repository's adapter through
+  `uv run --project <repo> skills-mcp`. `uv run --project` keeps the caller's working directory,
+  and `SKILLS_PROJECT_ROOT` is also set explicitly, so skills land in each developer's own
+  `.claude/skills/` and `skills.lock`.
+- **No approval prompts in the demo folders.** Their `.claude/settings.json` sets
+  `enableAllProjectMcpServers` and allows `mcp__skills-catalog`, so a reviewer is not interrupted
+  by trust and permission dialogs. This is scoped to the generated demo folders; the repository's
+  own `.mcp.json` still asks for approval as usual.
+- **The demo is tested.** `tests/e2e/test_two_devs.py` runs the script and launches each generated
+  `.mcp.json` with its exact command, args, env and cwd, so a broken demo configuration fails CI
+  rather than a reviewer's first try.
+- The setup refuses to write into an existing folder it did not create (marker file), and
+  `--reset` stops the demo's catalog before deleting its folder.
+
 ## Not done (would do next)
 
 - A real recorded Claude Code session for the README (the e2e test drives the same MCP path with

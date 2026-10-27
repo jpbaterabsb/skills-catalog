@@ -1,115 +1,178 @@
-# Demo walkthrough
+# Demo: two developers, two Claude Code sessions
 
-About five minutes. Two roles: **Dev 1** publishes from the terminal, **Dev 2** uses Claude Code
-in this repository. Both talk to the same catalog at `http://127.0.0.1:8765`.
+This is the real test of the system: **Alice** publishes a skill from her Claude Code session,
+**Bob** finds it from his own session just by describing what he needs, installs it and uses it.
+Later Alice ships a new version and Bob's assistant notices that his copy is out of date.
 
-## 0. Setup
+Each developer has their own project folder and their own local MCP adapter (`skills-mcp`). Both
+talk to the same catalog over HTTP, the way two laptops would talk to a team server.
 
-```bash
-./scripts/demo.sh
+```
+ Terminal 1: Alice ── Claude Code ── skills-mcp ─┐
+                                                 ├─ HTTP ─▶ catalog API ─▶ SQLite + blobs
+ Terminal 2: Bob ──── Claude Code ── skills-mcp ─┘
 ```
 
-This starts the catalog API in the background (it does nothing if one is already running),
-publishes `examples/release-note-draft` as v1, searches for it and shows its history. You can run
-it again safely: the second publish prints `Unchanged: release-note-draft is already at v1`.
+**Prerequisites:** [uv](https://docs.astral.sh/uv/) and [Claude Code](https://code.claude.com)
+(`claude`), signed in. About 10 minutes.
 
-Then open this repository in Claude Code. It picks up `.mcp.json` and asks you to approve the
-`skills-catalog` server; approve it (`/mcp` shows the server and its six tools).
+## 0. Set up (one command)
 
-## 1. Discover (UC-02, FR-02)
-
-> **Prompt:** "Is there a skill in our team catalog that helps write release notes?"
-
-Expected: the assistant calls `search_skills` with keywords such as `release notes` and answers
-with `release-note-draft (v1)` and its description. Only one line per skill enters the context.
-
-> **Prompt:** "Show me what it does."
-
-Expected: `get_skill` returns the `SKILL.md` instructions and lists `templates/release-notes.md`
-with its size, but not its contents.
-
-## 2. Install (UC-03, FR-03)
-
-> **Prompt:** "Install it in this project."
-
-Expected: `install_skill` replies
-`Installed release-note-draft v1 to …/.claude/skills/release-note-draft (digest verified: sha256:…)`.
-Show the new directory and `skills.lock`:
+From the repository root:
 
 ```bash
-ls -R .claude/skills/release-note-draft
-cat skills.lock
+./scripts/two-devs.sh            # creates ~/skills-catalog-demo (pass another folder as argument)
 ```
 
-The assistant never wrote these files itself: the adapter downloaded them, checked every hash and
-the bundle digest, and renamed them into place.
+It starts the catalog at `http://127.0.0.1:8765` in the background and creates:
 
-## 3. Use it
+```
+~/skills-catalog-demo/
+├── catalog-data/                 # the catalog's SQLite database and blobs (+ api.log)
+├── alice/
+│   ├── .mcp.json                 # skills-mcp as author "alice"
+│   ├── .claude/settings.json     # trusts that server and allows its tools (no prompts)
+│   └── incident-postmortem/      # a skill Alice wrote and wants to share
+└── bob/
+    ├── .mcp.json                 # skills-mcp as author "bob"
+    ├── .claude/settings.json
+    └── .claude/skills/           # empty: Bob has no skills yet
+```
 
-> **Prompt:** "Draft release notes for the last 5 commits of this repository."
-
-Expected: Claude Code loads the installed skill (it is in `.claude/skills/`) and follows its steps,
-using the template's headings. Skills are discovered at session start, so if it does not pick the
-skill up, restart the session.
-
-## 4. A new version (UC-04, FR-04)
-
-Dev 1 changes the template and republishes:
+Open two terminals:
 
 ```bash
-printf '\n## Contributors\n\n- \n' >> examples/release-note-draft/templates/release-notes.md
-uv run skills publish examples/release-note-draft      # Published release-note-draft v2 (…)
-uv run skills history release-note-draft
+cd ~/skills-catalog-demo/alice && claude     # Terminal 1
+cd ~/skills-catalog-demo/bob && claude       # Terminal 2
 ```
 
-> **Prompt:** "Are my installed skills up to date?"
+In each one, `/mcp` should list `skills-catalog` as connected with six tools.
 
-Expected: `check_updates` reports `release-note-draft: outdated (v1 → v2)`.
+## 1. Alice publishes (UC-01, FR-01)
 
-> **Prompt:** "What changed? Show the version history."
+**Alice:**
+> Publish the skill in ./incident-postmortem to the team catalog.
 
-Expected: `list_versions` shows v2 and v1 with author, date and digest.
+Expected: Claude calls `publish_skill` with the folder path and answers with
+`Published incident-postmortem v1 (sha256:…)`. The adapter read and validated the files itself;
+Claude never retyped them.
 
-## 5. Silent drift, now visible
+Optional, to see validation: ask Alice's Claude to "remove the description from
+incident-postmortem/SKILL.md and publish again". The tool returns
+`Skill is invalid: - frontmatter 'description' is required` and nothing is stored. Ask it to undo
+the change afterwards.
 
-Edit the installed copy by hand:
+## 2. Bob discovers it by need, not by name (UC-02, FR-02)
+
+**Bob:**
+> We just had a production outage. Is there a skill in our team catalog that can help me write the
+> postmortem?
+
+Expected: Claude calls `search_skills` with keywords like `outage postmortem` and finds
+`incident-postmortem (v1) — Writes a blameless incident postmortem…`. Search returns one line per
+skill, never skill bodies.
+
+> What does it do?
+
+Expected: `get_skill` shows the `SKILL.md` instructions and lists `templates/postmortem.md` with
+its size, without its contents.
+
+## 3. Bob installs and uses it (UC-03, FR-03)
+
+**Bob:**
+> Install it.
+
+Expected: `Installed incident-postmortem v1 to …/bob/.claude/skills/incident-postmortem (digest
+verified: sha256:…)`. Bob's folder now has the skill and a `skills.lock` recording version 1 and
+its digest. The files are byte-identical to Alice's: compare them with
+`diff -r ~/skills-catalog-demo/alice/incident-postmortem ~/skills-catalog-demo/bob/.claude/skills/incident-postmortem`.
+
+> Use it to draft the postmortem: the checkout API returned 500s from 14:02 to 14:39 UTC today
+> after a config deploy removed the payment provider's timeout; about 8% of checkouts failed;
+> rolled back at 14:35.
+
+Expected: Claude follows the skill (blameless tone, timeline, trigger vs. underlying cause, action
+items with owners) using the template's sections. Claude Code loads skills from `.claude/skills/`;
+if it does not pick up the new skill in the running session, exit and start `claude` again in
+Bob's folder.
+
+## 4. Alice ships v2 and Bob sees it (UC-04, FR-04)
+
+**Alice:**
+> Add a "Customer communication" section to the postmortem template in ./incident-postmortem and
+> publish the skill again.
+
+Expected: `Published incident-postmortem v2 (sha256:…)`. Publishing again without changes returns
+`Unchanged: incident-postmortem is already at v2`.
+
+**Bob:**
+> Are my installed skills up to date?
+
+Expected: `check_updates` reports `incident-postmortem: outdated (v1 → v2)`.
+
+> Show me its version history.
+
+Expected: `list_versions` shows v2 and v1, both published by `alice`, with dates and digests.
+
+## 5. Silent drift becomes visible
+
+This is the PRD's original pain: someone tweaks their local copy and it silently diverges.
+
+**Bob:**
+> Add a line "Reviewed by Bob" at the end of my installed incident-postmortem SKILL.md.
+
+> Now check my skills and upgrade incident-postmortem to the latest version.
+
+Expected: `check_updates` reports `incident-postmortem: locally modified (installed v1; catalog
+latest v2)`, and `install_skill` refuses because the local copy has changes, saying that
+`force=true` would discard them. Claude should ask before forcing.
+
+> Yes, discard my local change and upgrade.
+
+Expected: `install_skill` with `force=true` installs v2; `check_updates` then reports
+`incident-postmortem: up to date (v2)`, and `skills.lock` shows version 2.
+
+## 6. Clear "not found"
+
+**Bob:**
+> Get the skill called terraform-module-review from the catalog.
+
+Expected: a tool error, `skill 'terraform-module-review' not found`, and Claude says so instead of
+inventing content.
+
+> Do we have anything for Kubernetes Helm charts?
+
+Expected: `No skills matched "kubernetes helm charts".`
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| A tool says `catalog unreachable at http://127.0.0.1:8765` | Rerun `./scripts/two-devs.sh`; it restarts the catalog. Log: `~/skills-catalog-demo/catalog-data/api.log` |
+| `/mcp` does not list `skills-catalog` | Start `claude` from inside the `alice` or `bob` folder; `uv` must be on `PATH` |
+| The installed skill is not used | Start a new `claude` session in Bob's folder so it reloads `.claude/skills/` |
+
+Start over (stops the catalog and deletes the demo folder):
 
 ```bash
-echo "local tweak" >> .claude/skills/release-note-draft/SKILL.md
+./scripts/two-devs.sh --reset
 ```
 
-> **Prompt:** "Check my skills again, then upgrade release-note-draft."
+## Without an assistant
 
-Expected: `check_updates` reports `release-note-draft: locally modified (installed v1; catalog
-latest v2)`, and `install_skill` refuses with a message that the copy is locally modified and that
-`force=true` would discard the changes. The assistant should ask before forcing.
-
-> **Prompt:** "Yes, discard my local change and upgrade."
-
-Expected: `install_skill` with `force=true` installs v2; `check_updates` then reports `up to date (v2)`.
-
-## 6. Not found (UC-02, UC-03)
-
-> **Prompt:** "Get the skill called terraform-module-review."
-
-Expected: `get_skill` returns a tool error, `skill 'terraform-module-review' not found`, and the
-assistant says so instead of inventing content.
-
-> **Prompt:** "Do we have anything for Kubernetes Helm charts?"
-
-Expected: `search_skills` returns `No skills matched "kubernetes helm charts".`
-
-## 7. Publish from the assistant (optional)
-
-> **Prompt:** "Publish examples/release-note-draft to the catalog."
-
-Expected: `publish_skill` reads the directory itself and answers `Unchanged: release-note-draft is
-already at v2 (…)` (or `Published … v3` if it changed).
-
-## Reset
+The same flow from the terminal, against the catalog started above:
 
 ```bash
-kill "$(cat .catalog-data/api.pid)"
-rm -rf .catalog-data .claude/skills/release-note-draft skills.lock
-git checkout examples/release-note-draft
+uv run skills search postmortem
+uv run skills get incident-postmortem
+uv run skills history incident-postmortem
 ```
+
+`./scripts/demo.sh` is a shorter, CLI-only version that publishes `examples/release-note-draft`
+(it reuses a running catalog, or starts one with its data in `./.catalog-data`).
+
+## The same flow, automated
+
+`tests/e2e/test_two_devs.py` runs `scripts/two-devs.sh`, then launches each workspace's
+`.mcp.json` exactly as Claude Code does and drives it with the MCP SDK client: Alice publishes, Bob
+searches by need, installs byte-identically, and picks up Alice's v2.

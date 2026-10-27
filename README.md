@@ -5,44 +5,55 @@ publish a skill once and anyone's AI assistant can find, read and install it ove
 What was published is byte for byte what gets installed, and every project can tell whether its
 copy is still current (`skills.lock` + `check_updates`).
 
-## Quickstart
+## Try it: two developers, two Claude Code sessions
 
-Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
+Requires [uv](https://docs.astral.sh/uv/) and [Claude Code](https://code.claude.com) (`claude`).
+
+```bash
+./scripts/two-devs.sh                        # starts the catalog, creates ~/skills-catalog-demo/{alice,bob}
+```
+
+Then open one Claude Code session per developer:
+
+```bash
+cd ~/skills-catalog-demo/alice && claude     # Terminal 1: Alice
+cd ~/skills-catalog-demo/bob && claude       # Terminal 2: Bob
+```
+
+| Who | Ask Claude | What happens |
+|---|---|---|
+| Alice | "Publish the skill in ./incident-postmortem to the team catalog." | `publish_skill` → `Published incident-postmortem v1` |
+| Bob | "We just had a production outage. Is there a skill in our catalog that can help me write the postmortem?" | `search_skills` finds `incident-postmortem (v1)` |
+| Bob | "Install it." then "Use it to draft the postmortem for: …" | `install_skill` writes `.claude/skills/incident-postmortem/` (digest verified) + `skills.lock`; Claude follows the skill |
+| Alice | "Add a Customer communication section to the template and publish again." | `Published incident-postmortem v2` |
+| Bob | "Are my installed skills up to date?" | `check_updates` → `outdated (v1 → v2)` |
+
+Each folder has its own `.mcp.json` running this repo's MCP adapter as that developer; both talk
+to the same catalog. The full script, including local-drift detection and "not found" cases, is
+in **[docs/demo.md](docs/demo.md)**. `./scripts/two-devs.sh --reset` starts over.
+
+## Without an assistant
 
 ```bash
 uv sync
-uv run skills-catalog-api                              # catalog on http://127.0.0.1:8765
-```
-
-In a second terminal:
-
-```bash
-uv run skills publish examples/release-note-draft      # Published release-note-draft v1 (sha256:…)
+uv run skills-catalog-api                    # catalog on http://127.0.0.1:8765
+uv run skills publish examples/release-note-draft
 uv run skills search release notes
 uv run skills history release-note-draft
 ```
 
-Or run `./scripts/demo.sh`, which starts the catalog in the background and does the above.
-
-## Connect Claude Code
-
-Open this repository in Claude Code. The project-scoped `.mcp.json` registers the `skills-catalog`
-MCP server (`uv run skills-mcp`); approve it when prompted, and check it with `/mcp`. Then ask:
-
-- "Is there a skill in our team catalog for writing release notes?"
-- "Install release-note-draft in this project."
-- "Are my installed skills up to date?" / "Show the history of release-note-draft."
-- "Publish examples/release-note-draft to the catalog."
-
-Skills are installed to `.claude/skills/<name>/` and recorded in `skills.lock` at the project root.
-The full scripted demo, with expected answers, is in [docs/demo.md](docs/demo.md).
+Opening this repository itself in Claude Code also works: its `.mcp.json` registers the same
+server for the repo folder.
 
 ## Tests
 
 ```bash
-uv run pytest                                          # unit + end-to-end (real API + MCP stdio)
+uv run pytest                                # unit + end-to-end (real API + MCP over stdio)
 uv run ruff check . && uv run ruff format --check .
 ```
+
+The end-to-end tests include the two-developer demo itself: `tests/e2e/test_two_devs.py` runs
+`scripts/two-devs.sh` and launches each generated `.mcp.json` the way Claude Code does.
 
 ---
 
@@ -82,9 +93,9 @@ src/skills_catalog/
   api/       FastAPI app
   adapter/   HTTP client, installer (+ update checks), lockfile, MCP server
   cli.py
-examples/    release-note-draft skill
+examples/    release-note-draft, incident-postmortem skills
 tests/       unit/ (core, API, CLI, adapter, MCP in memory), e2e/ (real processes)
-scripts/     demo.sh
+scripts/     two-devs.sh (Claude Code demo), demo.sh (CLI demo)
 docs/        demo.md, NOTES.md
 ```
 
