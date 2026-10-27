@@ -23,6 +23,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     publish = commands.add_parser("publish", help="publish a skill directory as a new version")
     publish.add_argument("directory", type=Path)
+
+    search = commands.add_parser("search", help="find skills by keywords")
+    search.add_argument("query", nargs="+")
+    search.add_argument("--limit", type=int, default=5)
+
+    get = commands.add_parser("get", help="show a skill's SKILL.md and file list")
+    get.add_argument("name")
+    get.add_argument("--version", type=int, default=None)
+
+    history = commands.add_parser("history", help="list every version of a skill")
+    history.add_argument("name")
     return parser
 
 
@@ -35,7 +46,33 @@ def cmd_publish(client: CatalogClient, args: argparse.Namespace) -> None:
         print(f"Unchanged: {result.name} is already at v{result.version} ({result.digest})")
 
 
-COMMANDS = {"publish": cmd_publish}
+def cmd_search(client: CatalogClient, args: argparse.Namespace) -> None:
+    query = " ".join(args.query)
+    results = client.search(query, args.limit)
+    if not results:
+        print(f'No skills matched "{query}".')
+    for r in results:
+        print(f"{r.name} (v{r.latest_version}) — {r.description}")
+
+
+def cmd_get(client: CatalogClient, args: argparse.Namespace) -> None:
+    skill = client.get(args.name, args.version)
+    print(f"{skill.name} v{skill.version} ({skill.digest})")
+    print(f"published by {skill.published_by} at {skill.published_at}")
+    print()
+    print(skill.skill_md.rstrip("\n"))
+    print()
+    print("Files:")
+    for f in skill.files:
+        print(f"  {f.path} ({f.size} bytes)")
+
+
+def cmd_history(client: CatalogClient, args: argparse.Namespace) -> None:
+    for v in client.versions(args.name):
+        print(f"v{v.version}  {v.published_at}  {v.published_by}  {v.digest}")
+
+
+COMMANDS = {"publish": cmd_publish, "search": cmd_search, "get": cmd_get, "history": cmd_history}
 
 
 def run(argv: list[str] | None = None, client: CatalogClient | None = None) -> int:
