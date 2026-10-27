@@ -59,6 +59,89 @@ EXTRA_SKILLS = {
 }
 
 
+# Short but complete instructions, so an agent that reads a skill with get_skill sees a usable
+# procedure. (The first live agentic run used a generic placeholder body, and the agent rightly
+# declined to recommend a skill that looked like a stub.)
+SKILL_BODIES = {
+    "commit-message": """# Commit message
+
+1. Run `git diff --staged` and read every hunk; ignore unstaged changes.
+2. Pick the type: feat, fix, refactor, test, docs, chore, build, perf.
+3. Subject: `type(scope): imperative summary`, lowercase, no period, at most 72 characters.
+4. Body, when the change is not obvious: why it was needed and any trade-off, wrapped at 72.
+5. One logical change per commit: if the diff mixes concerns, propose how to split it.
+""",
+    "pr-description": """# Pull request description
+
+1. Read `git log main..HEAD` and the full diff of the branch.
+2. Title: what changes for users or callers, not how.
+3. Sections: Summary, Motivation, Changes, Testing (commands run and results), Risks and rollback.
+4. Link the issue and call out anything reviewers must look at closely.
+""",
+    "sql-migration-review": """# SQL migration review (PostgreSQL)
+
+1. For each statement, state the lock it takes (e.g. ACCESS EXCLUSIVE for most ALTER TABLE).
+2. Flag table rewrites: column type changes, volatile defaults, adding NOT NULL without a check.
+3. Require `CREATE INDEX CONCURRENTLY` and `lock_timeout` on large or hot tables.
+4. Check there is a rollback path and that application code tolerates both schemas mid-deploy.
+5. Verdict: safe, safe with changes (list them), or unsafe (explain).
+""",
+    "oncall-handoff": """# On-call handoff
+
+1. List open alerts with status, owner and next check time.
+2. Summarize ongoing incidents: impact, current mitigation, what is being watched.
+3. List follow-ups promised during the shift, with owners and due dates.
+4. Note risky deploys or maintenance planned for the next shift.
+5. End with "Needs attention first:" and at most three items.
+""",
+    "api-error-triage": """# API 5xx triage
+
+1. Find which endpoints and status codes spiked, and when the spike started.
+2. Correlate with deploys, config changes and dependency incidents around that time.
+3. Read error logs and traces for the top failing endpoint; quote the dominant error.
+4. Propose the fastest safe mitigation (rollback, feature flag, scale up) before root cause.
+5. Hand over to the incident-postmortem skill once mitigated.
+""",
+    "terraform-plan-review": """# Terraform plan review
+
+1. Run or read `terraform plan`; list every destroy and replace first.
+2. Flag security issues: public buckets, 0.0.0.0/0 ingress, wildcard IAM, unencrypted storage.
+3. Flag drift: resources changed outside Terraform that this apply would revert.
+4. Check state and provider version changes.
+5. Verdict: safe to apply, apply with changes, or do not apply (explain).
+""",
+    "dependency-upgrade": """# Dependency upgrade
+
+1. List outdated dependencies and group them: patch, minor, major.
+2. For each major upgrade, read the changelog and list breaking changes that affect this code.
+3. Upgrade one group at a time, update the lockfile, and run the full test suite after each.
+4. Fix or pin anything that breaks, and summarize what changed and what was deferred.
+""",
+    "adr-writer": """# Architecture Decision Record
+
+1. Title: the decision, as a short noun phrase. Status: proposed or accepted.
+2. Context: the forces and constraints, without arguing for an option yet.
+3. Decision: what was chosen, in one paragraph.
+4. Alternatives: each option considered and why it was not chosen.
+5. Consequences: what becomes easier, what becomes harder, and what to revisit later.
+""",
+    "customer-bug-report": """# Customer bug report
+
+1. Extract what the customer did, what they expected and what happened, in their words.
+2. Turn it into numbered reproduction steps; mark any step you had to assume.
+3. Record environment: plan, browser or client version, region, account id, time of the report.
+4. Attach evidence (screenshots, request ids) and state severity and number of customers affected.
+""",
+    "test-flake-hunter": """# Flaky test investigation
+
+1. Rerun the test in isolation and in the full suite, at least 20 times each; record failures.
+2. Look for time dependence, ordering between tests, shared state, randomness and network calls.
+3. Reproduce deterministically (fixed seed, frozen clock, reversed order) before fixing.
+4. Fix the cause; quarantine with an issue link only if the fix must wait.
+""",
+}
+
+
 @dataclass(frozen=True)
 class Case:
     need: str

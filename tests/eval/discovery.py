@@ -8,19 +8,15 @@ from pathlib import Path
 
 from skills_catalog.core.service import CatalogService
 from skills_catalog.core.validation import load_skill_dir
-from tests.eval.cases import CASES, EXAMPLES, EXTRA_SKILLS, Case
+from tests.eval.cases import CASES, EXAMPLES, EXTRA_SKILLS, SKILL_BODIES, Case
 from tests.helpers import skill_md
-
-BODY = (
-    "# Steps\n\n1. Gather the inputs listed above.\n2. Follow the team conventions.\n"
-    "3. Return the result as Markdown.\n"
-)
 
 
 def catalog_bundles() -> dict[str, dict[str, bytes]]:
     """The eval catalog: the synthetic skills plus the real examples, read from disk."""
     bundles = {
-        name: {"SKILL.md": skill_md(name, desc, BODY)} for name, desc in EXTRA_SKILLS.items()
+        name: {"SKILL.md": skill_md(name, desc, SKILL_BODIES[name])}
+        for name, desc in EXTRA_SKILLS.items()
     }
     for skill_dir in sorted(p for p in EXAMPLES.iterdir() if p.is_dir()):
         files, manifest = load_skill_dir(skill_dir)
