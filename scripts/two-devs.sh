@@ -35,6 +35,9 @@ touch "$TARGET/$MARKER"
 TARGET="$(cd "$TARGET" && pwd)"
 
 (cd "$REPO" && uv sync --quiet --inexact)
+# Everything below uses the environment just synced and never re-syncs it: a re-sync from a
+# process that does not see the same uv settings (e.g. UV_PYTHON) could rebuild the project's
+# .venv with another interpreter underneath whatever is already running from it.
 
 # 1. The shared catalog (what would be a team server in real life).
 if healthy; then
@@ -49,7 +52,7 @@ else
   mkdir -p "$TARGET/catalog-data"
   # Run the server executable itself (not `uv run`), so the saved PID is the process that
   # listens on the port and `--reset` really stops it.
-  API_BIN="$(cd "$REPO" && uv run --quiet python -c \
+  API_BIN="$(cd "$REPO" && uv run --quiet --no-sync python -c \
     'import os, sys; print(os.path.join(os.path.dirname(sys.executable), "skills-catalog-api"))')"
   SKILLS_CATALOG_DATA="$TARGET/catalog-data" nohup "$API_BIN" >"$TARGET/catalog-data/api.log" 2>&1 &
   echo $! >"$TARGET/catalog-data/api.pid"
@@ -63,7 +66,7 @@ fi
 write_workspace() {
   local dev="$1" dir="$TARGET/$1"
   mkdir -p "$dir/.claude/skills"
-  (cd "$REPO" && uv run --quiet python - "$dir" "$dev" "$REPO" "$SKILLS_CATALOG_URL") <<'PY'
+  (cd "$REPO" && uv run --quiet --no-sync python - "$dir" "$dev" "$REPO" "$SKILLS_CATALOG_URL") <<'PY'
 import json, sys
 from pathlib import Path
 
@@ -73,7 +76,8 @@ mcp = {
         "skills-catalog": {
             "type": "stdio",
             "command": "uv",
-            "args": ["run", "--quiet", "--project", repo, "skills-mcp"],
+            # --no-sync: launching the server must never modify the project's environment.
+            "args": ["run", "--quiet", "--no-sync", "--project", repo, "skills-mcp"],
             "env": {
                 "SKILLS_CATALOG_URL": url,
                 "SKILLS_AUTHOR": author,
