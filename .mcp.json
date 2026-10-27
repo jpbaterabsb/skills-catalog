@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "skills-catalog": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "skills-mcp"],
+      "env": {
+        "SKILLS_CATALOG_URL": "http://127.0.0.1:8765"
+      }
+    }
+  }
+}

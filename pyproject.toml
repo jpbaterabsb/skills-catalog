@@ -2,6 +2,7 @@
 name = "skills-catalog"
 version = "0.1.0"
 description = "A shared, versioned catalog of Agent Skills exposed to AI assistants over MCP"
+authors = [{ name = "Joao Paulo Oliveira Santos", email = "desenvolvedorjoaopaulo@gmail.com" }]
 requires-python = ">=3.11"
 dependencies = [
     "mcp>=1.27,<2",
@@ -20,6 +21,9 @@ skills-mcp = "skills_catalog.adapter.server:main"
 dev = [
     "pytest>=8,<9",
     "ruff>=0.6",
+]
+eval = [
+    "anthropic>=1,<2",
 ]
 
 [build-system]
@@ -40,3 +44,5 @@ ignore = ["S101"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+# Starlette nudges TestClient users towards httpx2; httpx is a pinned runtime dependency here.
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]

@@ -10,6 +10,10 @@ dist/
 .pytest_cache/
 .ruff_cache/
 
+# Secrets and eval traces
+.env
+.eval-runs/
+
 # Local catalog data and installs produced by running the system
 .catalog-data/
 /skills.lock
