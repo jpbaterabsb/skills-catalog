@@ -147,6 +147,10 @@ class Case:
     need: str
     query: str
     expected: str | None
+    # "dev" cases may inform changes to tool descriptions; "holdout" cases were written before the
+    # first such change and must never be used to tune them, so they show whether a change
+    # generalizes or only fixes the cases it was tuned on.
+    split: str = "dev"
 
 
 CASES = [
@@ -230,4 +234,31 @@ CASES = [
     Case("Help me with our Kubernetes Helm charts.", "kubernetes helm chart", None),
     Case("Translate the marketing page into Spanish.", "translate marketing spanish", None),
     Case("Generate PDF invoices for our customers.", "invoice pdf generation", None),
+    # Held out: written before the first tool-description change; never tune against these.
+    Case(
+        "Can you prep the PR text for this branch?",
+        "pull request description",
+        "pr-description",
+        "holdout",
+    ),
+    Case(
+        "A test in our nightly build only passes on retry.",
+        "flaky test retry",
+        "test-flake-hunter",
+        "holdout",
+    ),
+    Case(
+        "Is it safe to drop this column from the orders table?",
+        "schema migration locking",
+        "sql-migration-review",
+        "holdout",
+    ),
+    Case(
+        "Customers report checkout is failing with 502s.",
+        "5xx errors spike",
+        "api-error-triage",
+        "holdout",
+    ),
+    Case("Write the commit for these changes.", "commit message", "commit-message", "holdout"),
+    Case("Rotate our AWS access keys.", "rotate aws access keys", None, "holdout"),
 ]

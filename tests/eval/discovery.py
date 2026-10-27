@@ -84,12 +84,14 @@ class DiscoveryReport:
         return [r for r in self.results if not r.correct]
 
 
-def run_discovery(service: CatalogService, mode: str = "query", limit: int = 5) -> DiscoveryReport:
+def run_discovery(
+    service: CatalogService, mode: str = "query", limit: int = 5, split: str | None = None
+) -> DiscoveryReport:
     """``query``: the assistant's reformulated key terms, which is what ``search_skills`` asks for.
     ``need``: the developer's sentence passed verbatim, a lower bound for a model that does not
     reformulate."""
     report = DiscoveryReport(mode)
-    for case in CASES:
+    for case in (c for c in CASES if split is None or c.split == split):
         text = case.query if mode == "query" else case.need
         report.results.append(CaseResult(case, text, [r.name for r in service.search(text, limit)]))
     return report

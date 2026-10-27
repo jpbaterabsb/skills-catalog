@@ -104,6 +104,7 @@ class AgentRun:
     stop_reason: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
+    split: str = "dev"
 
     @property
     def searches(self) -> list[ToolCall]:
@@ -280,6 +281,7 @@ async def run_eval(
             )
             async with limiter, create_connected_server_and_client_session(server) as session:
                 run = await run_agent(client, session, case.need, case.expected, agent_model)
+                run.split = case.split
                 outcomes[i] = CaseOutcome(run, await judge(client, run, catalog, judge_model))
 
         async with anyio.create_task_group() as tg:
@@ -399,24 +401,34 @@ def main() -> None:
         print(f"- disagreed on: {d}")
 
     outcomes = anyio.run(run_eval, client, CASES, agent_model, judge_model)
-    s = summarize(outcomes, agent_model, judge_model)
     trace = write_trace(outcomes, REPO / ".eval-runs")
-    print(f"\n### Agentic discovery ({s.cases} needs, agent {agent_model}, judge {judge_model})\n")
-    print("| Metric | Value |")
-    print("|---|---|")
-    print(f"| Agent called `search_skills` | {s.searched:.0%} |")
-    print(
-        f"| First search ranked the right skill first (code-graded) | {s.retrieval_correct:.0%} |"
-    )
-    print(f"| Same, counting only needs where it searched | {s.retrieval_when_searched:.0%} |")
-    print(f"| Final answer correct (LLM judge) | {s.judge_correct:.0%} |")
-    print(f"| Final answer hallucinated a skill or capability (LLM judge) | {s.hallucinated:.0%} |")
-    print(f"| Tool calls per need (mean) | {s.avg_tool_calls:.1f} |")
-    print(f"| Estimated cost of this run | ${s.cost_usd:.2f} |")
+    groups = {
+        "dev": [o for o in outcomes if o.run.split == "dev"],
+        "holdout": [o for o in outcomes if o.run.split == "holdout"],
+        "all": outcomes,
+    }
+    groups = {k: v for k, v in groups.items() if v}
+    sums = {k: summarize(v, agent_model, judge_model) for k, v in groups.items()}
+    print(f"\n### Agentic discovery (agent {agent_model}, judge {judge_model})\n")
+    print("| Metric | " + " | ".join(f"{k} ({len(v)})" for k, v in groups.items()) + " |")
+    print("|---|" + "---|" * len(groups))
+    rows = [
+        ("Agent called `search_skills`", "searched", "{:.0%}"),
+        ("First search ranked the right skill first (code-graded)", "retrieval_correct", "{:.0%}"),
+        ("Same, counting only needs where it searched", "retrieval_when_searched", "{:.0%}"),
+        ("Final answer correct (LLM judge)", "judge_correct", "{:.0%}"),
+        ("Final answer hallucinated a skill or capability (LLM judge)", "hallucinated", "{:.0%}"),
+        ("Tool calls per need (mean)", "avg_tool_calls", "{:.1f}"),
+        ("Estimated cost", "cost_usd", "${:.2f}"),
+    ]
+    for label, attr, fmt in rows:
+        print(
+            f"| {label} | " + " | ".join(fmt.format(getattr(x, attr)) for x in sums.values()) + " |"
+        )
     failures = [o for o in outcomes if not o.verdict.correct or o.verdict.hallucinated]
     for o in failures:
         terms = [c.input.get("query") for c in o.run.searches]
-        print(f"\n- `{o.run.need}` searched {terms}: {o.verdict.reasoning}", end="")
+        print(f"\n- [{o.run.split}] `{o.run.need}` searched {terms}: {o.verdict.reasoning}", end="")
     print(f"\n\nStep-by-step trace: {trace.relative_to(REPO)}")
 
 
