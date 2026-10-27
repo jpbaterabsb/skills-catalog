@@ -27,7 +27,7 @@ The reasoning behind it, including which memory problems this does *not* solve, 
 | If you have | Do this | You will see |
 |---|---|---|
 | **2 minutes** | `uv sync && uv run pytest` | 193 tests: core, HTTP API, CLI, MCP adapter, real processes over stdio, the two-developer setup, deterministic evals |
-| **4 minutes**, nothing installed | [Watch the demo video](docs/media/two-devs-demo.mp4) | Two real Claude Code sessions: publish, discover by need, verified install, update, drift, not found |
+| **1 minute**, nothing installed | [Watch the demo](#try-it-two-developers-two-claude-code-sessions) (animated, 5× speed; [full video](docs/media/two-devs-demo.mp4)) | Two real Claude Code sessions: publish, discover by need, verified install, update, drift, not found |
 | **10 minutes** and Claude Code | [Two developers, two Claude Code sessions](#try-it-two-developers-two-claude-code-sessions) | Alice publishes a skill; Bob finds it by describing a need, installs it (digest verified) and uses it; drift and updates detected |
 | **5 minutes** and a Claude API key | [Agentic eval](#evidence) (`uv run --group eval python -m tests.eval.agentic`) | A real agent over the MCP tools, graded by code and by a calibrated LLM judge; about $0.35 |
 | Only reading time | [Architecture diagrams](docs/architecture.md), [test evidence](docs/evidence/README.md), [design](DESIGN.md) | How it works, what was measured, and why each decision was made |
@@ -37,12 +37,14 @@ Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/); the Claude Code demo
 
 ## Try it: two developers, two Claude Code sessions
 
-**Watch it first (4 min):** the whole flow below, recorded in two real Claude Code sessions.
+**Watch it first:** the whole flow below, recorded in two real Claude Code sessions (Alice in the
+middle pane, Bob on the right). The animation plays at 5× speed; the full 4-minute recording is
+[two-devs-demo.mp4](docs/media/two-devs-demo.mp4) (download, 5.9 MB).
 
-[![Two developers, two Claude Code sessions: Alice publishes, Bob discovers and installs](docs/media/two-devs-demo.jpg)](docs/media/two-devs-demo.mp4)
+![Two developers, two Claude Code sessions: Alice publishes, Bob discovers, installs and updates](docs/media/two-devs-demo.gif)
 
 <details>
-<summary>Chapters</summary>
+<summary>Chapters (timestamps in the full video)</summary>
 
 | Time | What happens |
 |---|---|

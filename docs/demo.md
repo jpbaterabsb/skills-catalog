@@ -13,8 +13,10 @@ talk to the same catalog over HTTP, the way two laptops would talk to a team ser
  Terminal 2: Bob ──── Claude Code ── skills-mcp ─┘
 ```
 
-**Recording:** [two-devs-demo.mp4](media/two-devs-demo.mp4) (4 min) shows this walkthrough end to
-end in two Claude Code sessions.
+**Recording:** this walkthrough end to end in two Claude Code sessions, at 5× speed below; the full
+4-minute video is [two-devs-demo.mp4](media/two-devs-demo.mp4) (download).
+
+![Two developers, two Claude Code sessions](media/two-devs-demo.gif)
 
 | Time | What happens |
 |---|---|
