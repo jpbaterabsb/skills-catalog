@@ -6,8 +6,9 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
+from . import search as _search
 from .digest import bundle_digest, file_sha256
-from .models import FileEntry, PublishResult
+from .models import FileEntry, PublishResult, SearchResult
 from .store import BlobStore, Store
 from .validation import validate_bundle
 
@@ -69,3 +70,8 @@ class CatalogService:
                 (name, manifest.description),
             )
         return PublishResult(name, version, digest, created=True)
+
+    def search(self, query: str, limit: int = _search.DEFAULT_LIMIT) -> list[SearchResult]:
+        """Find skills by name and description. Never returns skill bodies."""
+        with self.store.read() as conn:
+            return _search.search(conn, query, limit)
