@@ -20,6 +20,18 @@ treats that memory with the three properties it needs, and each one is measured,
 The reasoning behind it, including which memory problems this does *not* solve, is in
 [DESIGN.md §1 and §15](DESIGN.md).
 
+## Reviewer guide
+
+| If you have | Do this | You will see |
+|---|---|---|
+| **2 minutes** | `uv sync && uv run pytest` | 193 tests: core, HTTP API, CLI, MCP adapter, real processes over stdio, the two-developer setup, deterministic evals |
+| **10 minutes** and Claude Code | [Two developers, two Claude Code sessions](#try-it-two-developers-two-claude-code-sessions) | Alice publishes a skill; Bob finds it by describing a need, installs it (digest verified) and uses it; drift and updates detected |
+| **5 minutes** and a Claude API key | [Agentic eval](#evidence) (`uv run --group eval python -m tests.eval.agentic`) | A real agent over the MCP tools, graded by code and by a calibrated LLM judge; about $0.35 |
+| Only reading time | [Architecture diagrams](docs/architecture.md), [test evidence](docs/evidence/README.md), [design](DESIGN.md) | How it works, what was measured, and why each decision was made |
+
+Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/); the Claude Code demo also needs
+[Claude Code](https://code.claude.com). Nothing needs Docker or a cloud account.
+
 ## Try it: two developers, two Claude Code sessions
 
 Requires [uv](https://docs.astral.sh/uv/) and [Claude Code](https://code.claude.com) (`claude`).
@@ -76,6 +88,9 @@ The end-to-end tests include the two-developer demo itself: `tests/e2e/test_two_
 `scripts/two-devs.sh` and launches each generated `.mcp.json` the way Claude Code does.
 
 ## Evidence
+
+Every run below, with the case-by-case table of what the agent searched and how the judge graded
+it, is in **[docs/evidence](docs/evidence/README.md)** (raw JSONL traces included).
 
 Two evals back the memory claims. They run with the test suite (as regression guards) and
 `uv run python -m tests.eval.report` prints the tables below.
@@ -168,10 +183,19 @@ longer discriminates, so the next step is harder cases, not a higher score.
 
 ## How it works
 
+```mermaid
+flowchart LR
+    cc["Claude Code<br/>(any MCP client)"] -- "MCP over stdio" --> mcp["skills-mcp<br/>local adapter"]
+    mcp -- "verified install" --> disk[".claude/skills/ + skills.lock"]
+    mcp -- "HTTP" --> api["Catalog API"]
+    cli["skills CLI"] -- "HTTP" --> api
+    api --> core["core: validation, digests,<br/>versions, search"]
+    core --> db[("SQLite + FTS5")]
+    core --> blobs[("Blobs by sha256")]
 ```
-Claude Code ──MCP stdio──▶ skills-mcp (local adapter) ──HTTP──▶ catalog API ──▶ core ──▶ SQLite + blobs
-                            writes .claude/skills/, skills.lock
-```
+
+Sequence diagrams for publish and install, the drift state machine, the data model and the
+verification pipeline: **[docs/architecture.md](docs/architecture.md)**.
 
 - **core**: validation (Agent Skills format, safe paths, size limits), deterministic digests,
   immutable integer versions, SQLite with FTS5 search, content-addressed blob store.
