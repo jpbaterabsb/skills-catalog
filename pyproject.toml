@@ -40,3 +40,5 @@ ignore = ["S101"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+# Starlette nudges TestClient users towards httpx2; httpx is a pinned runtime dependency here.
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]
