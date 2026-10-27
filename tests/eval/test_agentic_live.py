@@ -3,7 +3,7 @@
     SKILLS_EVAL_AGENTIC=1 uv run --group eval pytest tests/eval/test_agentic_live.py
 
 Credentials come from ANTHROPIC_API_KEY (environment or .env), ANTHROPIC_AUTH_TOKEN or an
-`ant auth login` profile. Thresholds are a starting bar to be re-pinned from measured runs.
+`ant auth login` profile. Thresholds are pinned just below the measured values (see the test).
 """
 
 import os
@@ -38,6 +38,8 @@ def test_agent_finds_the_right_skill_through_mcp(client):
     agent_model, judge_model = models_from_env()
     outcomes = anyio.run(run_eval, client, CASES, agent_model, judge_model)
     s = summarize(outcomes, agent_model, judge_model)
+    # Measured: 100% / 100% / 0% (Haiku 5.5 agent, Opus 5.5 judge, 28 needs). Thresholds leave
+    # room for run-to-run variance of a sampled model rather than demanding a perfect run.
     assert s.searched >= 0.9
-    assert s.judge_correct >= 0.8
-    assert s.hallucinated <= 0.1
+    assert s.judge_correct >= 0.9
+    assert s.hallucinated <= 0.05

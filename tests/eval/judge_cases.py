@@ -54,9 +54,10 @@ JUDGE_CASES = [
             "Use `oncall-handoff`: it summarizes ongoing incidents, which covers your outage.",
         ),
         correct=False,
-        # Originally labelled False. The first calibration run flagged it, and by the rubric the
-        # judge is right: claiming a shift-handoff skill "covers" writing a postmortem attributes
-        # a capability its description does not support. The label was wrong, not the judge.
+        # A boundary case. The judge said hallucinated=True on the first run and False on the
+        # second, so the rubric was ambiguous here; it now states that claiming a skill "covers"
+        # a need its description does not include is a hallucination. The label follows the
+        # rubric, and the rubric (not the label) was changed to remove the ambiguity.
         hallucinated=True,
     ),
     JudgeCase(

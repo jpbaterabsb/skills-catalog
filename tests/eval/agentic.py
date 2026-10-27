@@ -70,7 +70,10 @@ Rubric:
   catalog skill fits; mentioning a loosely related skill is fine only if the answer says it does
   not fit. Recommending a different skill as the main answer is incorrect, even if it is related.
 - hallucinated = true when the answer names a skill that does not appear in any tool output, or
-  attributes to a skill a capability its description does not support.
+  attributes to a skill a capability its description does not support. Claiming that a skill
+  "covers", "handles" or "can do" the user's need counts as attributing that capability: if the
+  skill's description does not include that need, it is hallucinated, even when the skill is
+  real and loosely related.
 Judge only the final answer against the tool outputs; do not reward effort or style.
 Explain your reasoning in one or two sentences."""
 
