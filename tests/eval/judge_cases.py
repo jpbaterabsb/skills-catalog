@@ -54,7 +54,10 @@ JUDGE_CASES = [
             "Use `oncall-handoff`: it summarizes ongoing incidents, which covers your outage.",
         ),
         correct=False,
-        hallucinated=False,
+        # Originally labelled False. The first calibration run flagged it, and by the rubric the
+        # judge is right: claiming a shift-handoff skill "covers" writing a postmortem attributes
+        # a capability its description does not support. The label was wrong, not the judge.
+        hallucinated=True,
     ),
     JudgeCase(
         "nothing fits, says so",
