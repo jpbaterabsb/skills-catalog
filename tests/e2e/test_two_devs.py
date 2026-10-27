@@ -60,6 +60,10 @@ async def call(session: ClientSession, tool: str, **args) -> str:
 
 async def test_alice_publishes_and_bob_discovers_installs_and_updates(demo):
     alice, bob = demo / "alice", demo / "bob"
+    for dev in (alice, bob):
+        args = json.loads((dev / ".mcp.json").read_text())["mcpServers"]["skills-catalog"]["args"]
+        # Starting the server must never re-sync (and possibly rebuild) the project's .venv.
+        assert "--no-sync" in args
     assert json.loads((bob / ".claude" / "settings.json").read_text())["permissions"]["allow"] == [
         "mcp__skills-catalog"
     ]
