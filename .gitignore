@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+
+# Local catalog data and installs produced by running the system
+.catalog-data/
+/skills.lock
+/.claude/skills/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
