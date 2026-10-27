@@ -24,9 +24,13 @@ from .installer import install
 from .lockfile import lockfile_path
 
 INSTRUCTIONS = """\
-Shared catalog of Agent Skills (reusable, versioned instructions published by the team).
-Before writing a procedure from scratch, search the catalog for an existing skill. Typical flow:
-search_skills -> get_skill to read one -> install_skill to make it available in this project.
+Shared catalog of Agent Skills: reusable, versioned instructions that record how this team does
+recurring tasks (its conventions, templates and checklists).
+Before you carry out a task the team may have a standard way of doing (writing, drafting,
+reviewing, checking, triaging, investigating or preparing something), call search_skills first,
+even when you could do the task from general knowledge: a search is one short call, and the
+team's way beats a generic answer. If a skill matches, read it with get_skill and follow it, or
+offer install_skill; if nothing matches, say so in one line and continue.
 Use check_updates to see whether installed skills are current, list_versions to show history,
 and publish_skill to share a skill directory with the team."""
 
@@ -63,11 +67,13 @@ def build_server(
     @server.tool(
         annotations=READ_ONLY,
         description=(
-            "Search the team's shared skills catalog by keywords. Use this whenever the user asks "
-            "whether a skill, procedure or how-to exists for a task (e.g. 'is there a skill for "
-            "release notes?'), or before writing such a procedure from scratch. Pass the key "
-            "terms of the need, not a full sentence. Returns one line per match "
-            "(name, latest version, description), never the skill contents."
+            "Search the team's shared skills catalog by keywords. Call it before carrying out a "
+            "task the team may have a standard way of doing (writing, drafting, reviewing, "
+            "checking, triaging, investigating or preparing something), even if the user did not "
+            "mention skills and you could do the task yourself; and whenever the user asks "
+            "whether a skill or how-to exists. Pass the key terms of the need, not a full "
+            "sentence. Returns one line per match (name, latest version, description), never the "
+            "skill contents; no match means no team skill applies."
         ),
     )
     async def search_skills(query: str, limit: int = 5) -> CallToolResult:
