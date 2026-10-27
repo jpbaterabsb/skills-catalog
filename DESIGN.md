@@ -1,6 +1,6 @@
 # Skills Catalog — Design
 
-**Author:** _your name_ · **Status:** implemented (MVP) · **Time box:** ~4h
+**Author:** Joao Paulo Oliveira Santos · **Status:** implemented (MVP) · **Time box:** ~6h
 
 > **TL;DR.** I treated the Skills Catalog as **shared, versioned procedural memory for agents**.
 > The PRD's pain (a skill copied by hand and drifting across machines) is a *memory consistency*
@@ -98,7 +98,7 @@ versions(name FK, version INT, digest, description, published_by, published_at,
          PRIMARY KEY(name, version))
 version_files(name, version, path, sha256, size)
 blobs/<sha256>                       -- content-addressed files on disk
-skills_fts(name, description)        -- SQLite FTS5 index of the latest version
+skills_fts(name, description)        -- SQLite FTS5 index (porter stemming) of the latest version
 ```
 
 - **Skill format:** the open Agent Skills standard. A skill is a directory with `SKILL.md`
@@ -144,7 +144,7 @@ into an explicit, reviewable fact.
 
 ```json
 {
-  "catalog": "http://localhost:8765",
+  "catalog": "http://127.0.0.1:8765",
   "skills": {
     "release-note-draft": {
       "version": 2,
@@ -162,6 +162,7 @@ into an explicit, reviewable fact.
 - **locally modified** — files on disk no longer match the lock digest. This is exactly the
   silent drift the PRD describes, now detectable. The adapter refuses to overwrite modified files
   without an explicit `force`.
+- **missing on disk** — the skill is in the lock but its directory is gone.
 
 ## 8. Decisions
 
@@ -223,12 +224,12 @@ agent with tools will follow, and may ship executable `scripts/`.
 
 | Requirement | Implementation | Verified by |
 |---|---|---|
-| FR-01 Publish | `publish_skill`, CLI `publish`, validation in `core` | Unit: valid publish; missing name/description/body rejected, nothing stored |
-| FR-02 Discover | `search_skills` over FTS5 | Unit: match / no match; eval set (Section 11) |
-| FR-03 Retrieve | `get_skill`, `install_skill` | E2E: publish → install → digest equal; not found |
-| FR-04 Version | immutable versions, `list_versions`, `version` param | Unit: republish creates v2, v1 retrievable, history shows both |
-| NFR Consistency | Section 4 invariant | Byte comparison of original vs installed tree |
-| NFR Assistant-mediated | MCP adapter | Recorded Claude Code session (README) |
+| FR-01 Publish | `publish_skill`, CLI `publish`, validation in `core` | Unit: valid publish; every rejection rule, all errors reported together, nothing stored (`test_validation`, `test_publish`) |
+| FR-02 Discover | `search_skills` over FTS5 | Unit: match / no match / special characters / limit (`test_search`); E2E search by need. Eval set (Section 11) not built yet |
+| FR-03 Retrieve | `get_skill`, `install_skill` | Unit: byte-identical install, corrupted blob leaves nothing (`test_installer`); E2E: publish → install → trees equal; not found |
+| FR-04 Version | immutable versions, `list_versions`, `version` param, `check_updates` | Unit: republish creates v2, v1 retrievable, history shows both, concurrent publishes (`test_publish`, `test_retrieve`, `test_concurrency`); update states (`test_updates`); E2E outdated → locally modified → force |
+| NFR Consistency | Section 4 invariant | Byte comparison of original vs installed tree, incl. binary and CRLF files (E2E) |
+| NFR Assistant-mediated | MCP adapter | E2E through the real `skills-mcp` process with the MCP SDK stdio client; demo prompts in `docs/demo.md` |
 | NFR Responsiveness | Local SQLite, small tool outputs | Observed in the demo |
 
 ## 11. Testing and evals
@@ -237,7 +238,7 @@ agent with tools will follow, and may ship executable `scripts/`.
 - **End-to-end:** start API, drive the MCP adapter with the MCP SDK client, publish → search →
   install → compare trees byte-for-byte → republish → `check_updates` reports outdated → modify a
   file locally → `check_updates` reports locally modified.
-- **Discovery eval (small):** ~10 natural-language needs with the expected skill (or "none"),
+- **Discovery eval (small, not built yet):** ~10 natural-language needs with the expected skill (or "none"),
   e.g. "is there something to help write release notes?" → `release-note-draft`. Measures whether
   tool descriptions + skill descriptions route correctly. This is the cheapest leading indicator of
   whether the memory is actually *recallable*.
