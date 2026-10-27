@@ -292,6 +292,11 @@ agent with tools will follow, and may ship executable `scripts/`.
   message". The trigger was rewritten in terms of kinds of work; six held-out needs, written
   before the change and never used to tune it, measure whether it generalizes.
 
+  Second run, after the change: 100% search rate, 100% retrieval, 100% judge-correct and 0%
+  hallucination on both the dev and the held-out needs, at 2.7 tool calls per need instead of
+  1.5. One run on 28 needs; the set is now saturated and needs harder cases to keep
+  discriminating.
+
 ## 12. Build plan (time box)
 
 The core is built from scratch; existing registries are covered as prior art only (Section 2).

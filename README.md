@@ -148,7 +148,21 @@ standard way of doing ([server.py](src/skills_catalog/adapter/server.py)). The r
 two flaws in the eval itself, both fixed: a metric that credited "no match" without a search, and
 a synthetic skill body so thin that the agent rightly called it a stub. Six held-out needs,
 written before the description change and never used to tune it, now show whether the fix
-generalizes. **Next run: pending** (same command; it reports dev and holdout side by side).
+generalizes.
+
+| Second live run, after the fixes | dev (22) | holdout (6) |
+|---|---|---|
+| Agent called `search_skills` | 100% | 100% |
+| First search ranked the right skill first | 100% | 100% |
+| Final answer correct (LLM judge) | 100% | 100% |
+| Final answer hallucinated (LLM judge) | 0% | 0% |
+| Tool calls per need (mean) | 2.6 | 3.0 |
+
+The held-out needs improved as much as the dev needs, so the description change generalizes
+rather than memorizing the failures. The price is more tool calls per need (1.5 → 2.7, about
+$0.012 per need), the trade-off the new trigger accepts. Caveats: one run of a sampled model on
+28 needs, so a single case moves a metric by 4 to 17 points; and a perfect score means this set no
+longer discriminates, so the next step is harder cases, not a higher score.
 
 ---
 

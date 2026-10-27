@@ -177,8 +177,29 @@ findings, each handled in its own commit:
 
 To avoid overfitting the descriptions to the cases that exposed the problem, six **held-out**
 needs were written before the description change; reports show dev and holdout side by side.
-The re-run after these changes is pending (it needs the API key), so the live thresholds are
-unchanged until then.
+## Second agentic run
+
+After the changes: search rate, retrieval and judge-correct all 100% and hallucination 0%, on dev
+(22) and holdout (6) alike, for $0.35. Read with care:
+
+- **Generalization, not memorization.** The held-out needs, never used to tune the description,
+  improved as much as the dev needs.
+- **Cost of the fix.** Tool calls per need went from 1.5 to 2.7: the agent now searches more and
+  usually reads a skill with `get_skill` before recommending it. About $0.012 per need with Haiku
+  as the agent; acceptable for the behaviour the product depends on.
+- **One unrequested install.** For "I need an RCA document" the agent installed
+  `incident-postmortem` without asking; the instructions say to *offer* it. Harmless here, but a
+  check for "acted without consent" would be a good next code-graded metric.
+- **The judge flipped on a boundary case.** The same calibration case disagreed in opposite
+  directions across the two runs, so the rubric was ambiguous there. The rubric was made explicit
+  (claiming a skill covers a need its description does not include is a hallucination) instead
+  of flipping the label again.
+- **Small and saturated.** One run of a sampled model on 28 needs: one case moves a metric by 4
+  (dev) to 17 (holdout) points. A perfect score also means the set stopped discriminating; the
+  next step is harder cases (ambiguous needs, two plausible skills, needs phrased in another
+  language), not chasing a higher number.
+- Live thresholds re-pinned from this run with room for variance: search ≥ 90%, judge-correct
+  ≥ 90%, hallucination ≤ 5%.
 
 ## Not done (would do next)
 
