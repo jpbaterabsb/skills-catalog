@@ -46,27 +46,35 @@ def path_errors(path: str) -> list[str]:
     return errors
 
 
-def parse_skill_md(raw: bytes) -> tuple[SkillManifest | None, list[str]]:
-    """Parse ``SKILL.md`` into a manifest, returning every problem found."""
+def split_frontmatter(raw: bytes) -> tuple[dict | None, str, str | None]:
+    """Split ``SKILL.md`` into ``(frontmatter mapping, body, error)``."""
     try:
         text = raw.decode("utf-8")
     except UnicodeDecodeError:
-        return None, [f"{SKILL_FILE} must be UTF-8 encoded"]
+        return None, "", f"{SKILL_FILE} must be UTF-8 encoded"
 
     lines = text.splitlines(keepends=True)
     if not lines or lines[0].rstrip("\r\n") != "---":
-        return None, [f"{SKILL_FILE} must start with a YAML frontmatter block delimited by '---'"]
+        return None, "", f"{SKILL_FILE} must start with a YAML frontmatter block delimited by '---'"
     closing = next((i for i in range(1, len(lines)) if lines[i].rstrip("\r\n") == "---"), None)
     if closing is None:
-        return None, [f"{SKILL_FILE} frontmatter is not closed with '---'"]
+        return None, "", f"{SKILL_FILE} frontmatter is not closed with '---'"
 
     try:
         # safe_load only: yaml.load can construct arbitrary Python objects.
         meta = yaml.safe_load("".join(lines[1:closing]))
     except yaml.YAMLError as exc:
-        return None, [f"{SKILL_FILE} frontmatter is not valid YAML: {_first_line(exc)}"]
+        return None, "", f"{SKILL_FILE} frontmatter is not valid YAML: {_first_line(exc)}"
     if not isinstance(meta, dict):
-        return None, [f"{SKILL_FILE} frontmatter must be a YAML mapping"]
+        return None, "", f"{SKILL_FILE} frontmatter must be a YAML mapping"
+    return meta, "".join(lines[closing + 1 :]), None
+
+
+def parse_skill_md(raw: bytes) -> tuple[SkillManifest | None, list[str]]:
+    """Parse ``SKILL.md`` into a manifest, returning every problem found."""
+    meta, body, error = split_frontmatter(raw)
+    if meta is None:
+        return None, [error or "invalid frontmatter"]
 
     errors: list[str] = []
     name = meta.get("name")
@@ -90,7 +98,6 @@ def parse_skill_md(raw: bytes) -> tuple[SkillManifest | None, list[str]]:
             f"frontmatter 'description' must be at most {MAX_DESCRIPTION_LENGTH} characters"
         )
 
-    body = "".join(lines[closing + 1 :])
     if not body.strip():
         errors.append(f"{SKILL_FILE} body after the frontmatter must not be empty")
 
@@ -186,12 +193,12 @@ def load_skill_dir(root: Path) -> tuple[dict[str, bytes], SkillManifest]:
 def _dir_name_error(files: Mapping[str, bytes], root: Path) -> str | None:
     if SKILL_FILE not in files:
         return None
-    manifest, _ = parse_skill_md(files[SKILL_FILE])
+    # Checked on the raw frontmatter so the mismatch is reported alongside any other error.
+    meta, _, _ = split_frontmatter(files[SKILL_FILE])
+    name = meta.get("name") if meta else None
     dir_name = root.resolve().name
-    if manifest is not None and manifest.name != dir_name:
-        return (
-            f"frontmatter 'name' ({manifest.name!r}) must match the directory name ({dir_name!r})"
-        )
+    if isinstance(name, str) and name != dir_name:
+        return f"frontmatter 'name' ({name!r}) must match the directory name ({dir_name!r})"
     return None
 
 

@@ -189,3 +189,15 @@ class TestLoadSkillDir:
     def test_not_a_directory(self, tmp_path):
         with pytest.raises(ValidationError, match="not a directory"):
             load_skill_dir(tmp_path / "missing")
+
+
+def test_directory_name_mismatch_is_reported_with_other_errors(tmp_path):
+    root = tmp_path / "dir-name"
+    root.mkdir()
+    (root / "SKILL.md").write_bytes(skill_md("my-skill", None, body=""))
+    with pytest.raises(ValidationError) as exc_info:
+        load_skill_dir(root)
+    errors = exc_info.value.errors
+    assert any("must match the directory name" in e for e in errors)
+    assert any("description" in e for e in errors)
+    assert any("body" in e for e in errors)
