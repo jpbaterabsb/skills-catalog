@@ -34,7 +34,7 @@ mkdir -p "$TARGET"
 touch "$TARGET/$MARKER"
 TARGET="$(cd "$TARGET" && pwd)"
 
-(cd "$REPO" && uv sync --quiet)
+(cd "$REPO" && uv sync --quiet --inexact)
 
 # 1. The shared catalog (what would be a team server in real life).
 if healthy; then

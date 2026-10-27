@@ -10,7 +10,7 @@ export SKILLS_CATALOG_DATA="${SKILLS_CATALOG_DATA:-.catalog-data}"
 step() { printf '\n\033[1m$ %s\033[0m\n' "$*"; }
 healthy() { curl -fsS "$SKILLS_CATALOG_URL/health" >/dev/null 2>&1; }
 
-uv sync --quiet
+uv sync --quiet --inexact
 
 if healthy; then
   echo "Catalog already running at $SKILLS_CATALOG_URL"
