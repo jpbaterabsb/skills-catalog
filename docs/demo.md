@@ -13,6 +13,24 @@ talk to the same catalog over HTTP, the way two laptops would talk to a team ser
  Terminal 2: Bob ──── Claude Code ── skills-mcp ─┘
 ```
 
+**Recording:** [two-devs-demo.mp4](media/two-devs-demo.mp4) (4 min) shows this walkthrough end to
+end in two Claude Code sessions.
+
+| Time | What happens |
+|---|---|
+| 0:00 | `./scripts/two-devs.sh` starts the catalog; Claude Code opens in Alice's and Bob's folders (Claude Haiku 5.5) |
+| 0:30 | **Alice** publishes `incident-postmortem` → v1, digest shown, no validation errors |
+| 0:55 | **Bob** asks for help with a postmortem without naming any skill; `search_skills` finds it |
+| 1:10 | Bob reads it (`get_skill`): instructions and file list, no file contents |
+| 1:30 | Bob installs it: `digest verified`, files in `.claude/skills/`, recorded in `skills.lock` |
+| 1:45 | Bob uses it to draft a real postmortem with the team's template |
+| 2:00 | **Alice** adds a section to the template and republishes → v2 |
+| 2:20 | Bob: *"Are my installed skills up to date?"* → `outdated`; version history by Alice |
+| 2:55 | Bob edits his installed copy by hand (silent drift) |
+| 3:10 | Upgrade refused: `locally modified`; the assistant asks before forcing |
+| 3:25 | Bob confirms; forced upgrade to v2; `up to date` |
+| 3:40 | Unknown skill → clear "not found"; Kubernetes need → "nothing matched" |
+
 **Verified:** this walkthrough was tested manually in Claude Code using the Claude Haiku 5.5
 model (`claude-haiku-5-5`). A small, fast model was a deliberate choice: if the tool descriptions
 route it correctly, larger models will too.

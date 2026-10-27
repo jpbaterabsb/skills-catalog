@@ -7,7 +7,7 @@ reproduced from the repository (commands below each section).
 |---|---|---|
 | Unit and end-to-end suite (191 tests): core, API, CLI, adapter, MCP over stdio, the two-developer setup | `uv run pytest` | No |
 | Discovery and context-budget evals (deterministic) | `uv run python -m tests.eval.report` | No |
-| Manual two-session test in Claude Code (Alice publishes, Bob discovers, installs and uses) | [docs/demo.md](../demo.md) | Claude Code login |
+| Manual two-session test in Claude Code (Alice publishes, Bob discovers, installs and uses) | [docs/demo.md](../demo.md), [video](../media/two-devs-demo.mp4) | Claude Code login |
 | Agentic eval with an LLM judge, run 1 (baseline) and run 2 (after the fix) | this page | Yes |
 
 ## Manual test in Claude Code
@@ -18,6 +18,9 @@ surfaced a real bug: a stale catalog process whose data directory had been delet
 `/health` with "ok" while every request failed with HTTP 500, and the setup script reused it.
 Fixed in `e4bd747` (`/health` now checks storage; scripts track the real server PID), with E2E
 tests for both. The second attempt worked end to end.
+
+Recording of the working run: [two-devs-demo.mp4](../media/two-devs-demo.mp4) (4 min, chapters in
+[docs/demo.md](../demo.md)).
 
 ## Agentic eval: two runs
 
