@@ -13,6 +13,10 @@ talk to the same catalog over HTTP, the way two laptops would talk to a team ser
  Terminal 2: Bob ──── Claude Code ── skills-mcp ─┘
 ```
 
+**Verified:** this walkthrough was tested manually in Claude Code using the Claude Haiku 5.5
+model (`claude-haiku-5-5`). A small, fast model was a deliberate choice: if the tool descriptions
+route it correctly, larger models will too.
+
 **Prerequisites:** [uv](https://docs.astral.sh/uv/) and [Claude Code](https://code.claude.com)
 (`claude`), signed in. About 10 minutes.
 

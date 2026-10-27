@@ -1,5 +1,7 @@
 # Skills Catalog
 
+**Author:** Joao Paulo Oliveira Santos
+
 A shared, versioned catalog of [Agent Skills](https://agentskills.io/specification): developers
 publish a skill once and anyone's AI assistant can find, read and install it over MCP.
 What was published is byte for byte what gets installed, and every project can tell whether its
@@ -31,6 +33,11 @@ cd ~/skills-catalog-demo/bob && claude       # Terminal 2: Bob
 Each folder has its own `.mcp.json` running this repo's MCP adapter as that developer; both talk
 to the same catalog. The full script, including local-drift detection and "not found" cases, is
 in **[docs/demo.md](docs/demo.md)**. `./scripts/two-devs.sh --reset` starts over.
+
+**Verified with a real assistant:** this walkthrough was tested manually end to end in Claude Code
+using the Claude Haiku 5.5 model (`claude-haiku-5-5`): two sessions, one publishing and one
+discovering, installing and using the skill. The same flow also runs automatically in the
+end-to-end tests (see below).
 
 ## Without an assistant
 

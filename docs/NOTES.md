@@ -96,9 +96,19 @@ plan. Each entry says why.
 - The setup refuses to write into an existing folder it did not create (marker file), and
   `--reset` stops the demo's catalog before deleting its folder.
 
+## Manual verification
+
+- The two-developer walkthrough in `docs/demo.md` was tested manually end to end in Claude Code
+  using the Claude Haiku 5.5 model (`claude-haiku-5-5`): Alice published `incident-postmortem`,
+  Bob found it by describing a need, installed it and used it. Testing with a small model is
+  deliberate: tool descriptions are the routing prompt, and if they work for Haiku they work
+  for larger models.
+- The first manual run surfaced a real bug: a demo catalog left running after its data
+  directory was deleted kept answering `/health` with "ok" while every request failed with
+  HTTP 500, and the setup script reused it. Fixed by making `/health` check storage and by
+  saving the server's own PID so `--reset` really stops it (both covered by E2E tests).
+
 ## Not done (would do next)
 
-- A real recorded Claude Code session for the README (the e2e test drives the same MCP path with
-  the SDK client instead).
 - The ~10-query discovery eval from DESIGN §11, run through a model, to measure routing.
 - Garbage collection of orphaned blobs; deprecate/yank; ownership and authentication.

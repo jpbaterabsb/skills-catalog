@@ -2,6 +2,7 @@
 name = "skills-catalog"
 version = "0.1.0"
 description = "A shared, versioned catalog of Agent Skills exposed to AI assistants over MCP"
+authors = [{ name = "Joao Paulo Oliveira Santos", email = "desenvolvedorjoaopaulo@gmail.com" }]
 requires-python = ">=3.11"
 dependencies = [
     "mcp>=1.27,<2",

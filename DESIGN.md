@@ -229,7 +229,7 @@ agent with tools will follow, and may ship executable `scripts/`.
 | FR-03 Retrieve | `get_skill`, `install_skill` | Unit: byte-identical install, corrupted blob leaves nothing (`test_installer`); E2E: publish → install → trees equal; not found |
 | FR-04 Version | immutable versions, `list_versions`, `version` param, `check_updates` | Unit: republish creates v2, v1 retrievable, history shows both, concurrent publishes (`test_publish`, `test_retrieve`, `test_concurrency`); update states (`test_updates`); E2E outdated → locally modified → force |
 | NFR Consistency | Section 4 invariant | Byte comparison of original vs installed tree, incl. binary and CRLF files (E2E) |
-| NFR Assistant-mediated | MCP adapter | E2E through the real `skills-mcp` process with the MCP SDK stdio client, including the two-developer setup (`test_two_devs`); manual two-session Claude Code walkthrough in `docs/demo.md` |
+| NFR Assistant-mediated | MCP adapter | E2E through the real `skills-mcp` process with the MCP SDK stdio client, including the two-developer setup (`test_two_devs`); two-session walkthrough (`docs/demo.md`) tested manually in Claude Code with Claude Haiku 5.5 |
 | NFR Responsiveness | Local SQLite, small tool outputs | Observed in the demo |
 
 ## 11. Testing and evals
