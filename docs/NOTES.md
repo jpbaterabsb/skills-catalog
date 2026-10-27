@@ -157,6 +157,29 @@ plan. Each entry says why.
   covered by offline tests with a scripted model, and the live thresholds (search ≥ 90%,
   judge-correct ≥ 80%, hallucination ≤ 10%) are a starting bar to re-pin after the first runs.
 
+## First agentic run and what it changed
+
+The first live run (agent Claude Haiku 5.5, judge Claude Opus 5.5, 22 needs, $0.24) produced:
+search rate 77%, retrieval 77% overall and 100% when the agent searched, judge-correct 73%,
+hallucination 0%, judge calibration 6 of 7. Reading the JSONL trace case by case gave four
+findings, each handled in its own commit:
+
+1. **Routing, the real product issue.** The agent never searched for 5 needs and answered from
+   general knowledge. The `search_skills` trigger only covered "is there a skill for X" and
+   "writing a procedure from scratch". Rewritten to fire before any task the team may have a
+   standard way of doing, worded as kinds of work rather than the failing cases.
+2. **A metric bug.** A "nothing fits" need where the agent never searched counted as a correct
+   retrieval. Retrieval now requires a search, with a second metric over searched needs only.
+3. **A fixture artifact.** The agent read `oncall-handoff`, saw a placeholder body and declined to
+   recommend it as a stub; it was right. Synthetic skills now have real procedures.
+4. **A wrong hand label.** The judge's one disagreement was correct under the rubric (claiming a
+   handoff skill "covers your outage" attributes an unsupported capability); the label was fixed.
+
+To avoid overfitting the descriptions to the cases that exposed the problem, six **held-out**
+needs were written before the description change; reports show dev and holdout side by side.
+The re-run after these changes is pending (it needs the API key), so the live thresholds are
+unchanged until then.
+
 ## Not done (would do next)
 
 - Running the agentic eval regularly (it needs an API key, so it is opt-in today) and re-pinning

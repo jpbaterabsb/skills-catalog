@@ -131,6 +131,25 @@ step-by-step trace of every case to `.eval-runs/*.jsonl`. As a test with pass th
 `SKILLS_EVAL_AGENTIC=1 uv run --group eval pytest tests/eval/test_agentic_live.py`. Without a
 key, its harness is still covered by offline tests that script the model's responses.
 
+| First live run, before any fix (22 dev needs) | Value |
+|---|---|
+| Agent called `search_skills` | 77% |
+| First search ranked the right skill first | 77% (100% of the needs where it searched) |
+| Final answer correct (LLM judge) | 73% |
+| Final answer hallucinated a skill or capability (LLM judge) | 0% |
+| Judge agreement with hand labels | 86% (6 of 7; the disagreement was a wrong label) |
+| Cost of the run | $0.24 |
+
+What it found, and what changed: retrieval was never the problem (every search the agent made
+ranked the right skill first); routing was. For 5 needs the agent never consulted the catalog and
+answered from general knowledge, because the tool description only said to search when asked
+whether a skill exists. The trigger now says to search before any task the team may have a
+standard way of doing ([server.py](src/skills_catalog/adapter/server.py)). The run also exposed
+two flaws in the eval itself, both fixed: a metric that credited "no match" without a search, and
+a synthetic skill body so thin that the agent rightly called it a stub. Six held-out needs,
+written before the description change and never used to tune it, now show whether the fix
+generalizes. **Next run: pending** (same command; it reports dev and holdout side by side).
+
 ---
 
 ## How it works

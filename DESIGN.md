@@ -285,6 +285,13 @@ agent with tools will follow, and may ship executable `scripts/`.
   (`uv run --group eval python -m tests.eval.agentic`, key in `.env`); its harness is covered offline
   with a scripted model.
 
+  First run (Haiku 5.5 agent, Opus 5.5 judge, 22 needs, $0.24): the agent searched for 77% of
+  needs, every search ranked the right skill first, the judge rated 73% of answers correct and 0%
+  hallucinated. The gap was routing, not retrieval: the old `search_skills` trigger ("when the
+  user asks whether a skill exists") does not fire on ordinary requests like "write a commit
+  message". The trigger was rewritten in terms of kinds of work; six held-out needs, written
+  before the change and never used to tune it, measure whether it generalizes.
+
 ## 12. Build plan (time box)
 
 The core is built from scratch; existing registries are covered as prior art only (Section 2).
