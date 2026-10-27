@@ -109,6 +109,28 @@ because "the" or "our" matched every skill.
 Discovery cost depends on the number of results, not on the size of the catalog: preloading
 100 skills like the examples would take about 50,000 tokens, while a search stays at five lines.
 
+**Does a real agent find the right skill?** The two evals above fix the search query. The agentic
+eval does not: each need goes to Claude Haiku 5.5 in a tool loop over the real MCP server, and every
+step (tool, arguments, output) is recorded. Grading has two layers: code-graded checks on the trace
+(did it search, did the first search rank the right skill first) and an **LLM judge** (Claude
+Opus 5.5, structured JSON output) that grades the final answer against a rubric: right skill or a
+clear "none fits", and no invented skills or capabilities. The judge is calibrated first against
+seven hand-labelled answers built to catch a lenient judge (a related but wrong skill, a lexical
+false positive, an invented name, a padded capability).
+
+It calls the Claude API, so it is opt-in and needs your key:
+
+```bash
+cp .env.example .env                          # then set ANTHROPIC_API_KEY in .env
+uv run --group eval python -m tests.eval.agentic
+```
+
+It prints judge agreement, search rate, retrieval accuracy, judge-graded correctness,
+hallucination rate and the estimated cost of the run (well under a dollar), and writes the
+step-by-step trace of every case to `.eval-runs/*.jsonl`. As a test with pass thresholds:
+`SKILLS_EVAL_AGENTIC=1 uv run --group eval pytest tests/eval/test_agentic_live.py`. Without a
+key, its harness is still covered by offline tests that script the model's responses.
+
 ---
 
 ## How it works
@@ -149,7 +171,7 @@ src/skills_catalog/
   cli.py
 examples/    release-note-draft, incident-postmortem skills
 tests/       unit/ (core, API, CLI, adapter, MCP in memory), e2e/ (real processes),
-             eval/ (discovery and context-budget evals)
+             eval/ (discovery, context-budget and agentic LLM-judge evals)
 scripts/     two-devs.sh (Claude Code demo), demo.sh (CLI demo)
 docs/        demo.md, NOTES.md
 ```

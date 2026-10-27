@@ -131,10 +131,37 @@ plan. Each entry says why.
   result, `get_skill` without supporting file contents, a one-line install confirmation, and each
   step cheaper than inlining the skill.
 
+## Agentic eval and LLM-as-judge
+
+- **Why a model in the loop.** The discovery eval fixes the query, so it measures the index, not
+  the assistant. The agentic eval sends the developer's sentence to a real model with only the MCP
+  tools, so it measures what the design actually relies on: that the model searches, reformulates
+  well and reports honestly.
+- **Manual loop, not the SDK's tool runner.** The runner is beta and hides the tool results; the
+  manual loop records every call and output for grading and for the JSONL trace.
+- **Two grading layers.** Code grades what is objective from the trace (searched, first result).
+  The LLM judge grades what is not (did the answer recommend the right skill or honestly say none
+  fits; did it invent anything), with a fixed rubric and JSON-schema output so verdicts parse
+  deterministically.
+- **The judge is evaluated too.** `judge_cases.py` holds seven hand-labelled traces aimed at a
+  lenient judge. The live test requires at most one disagreement before trusting the judge.
+- **Different models for agent and judge.** Haiku 5.5 as the agent (the cheapest model the tool
+  descriptions must still work for, and the one used in the manual Claude Code test); Opus 5.5 as
+  the judge (stronger than what it grades). Both overridable via `SKILLS_EVAL_AGENT_MODEL` and
+  `SKILLS_EVAL_JUDGE_MODEL`.
+- **No refusal fallback for the judge.** The Claude API can re-run a refused request on another
+  model; for a judge that would silently change the measurement, so a refusal fails the run.
+- **Dependencies.** The `anthropic` SDK is in an optional `eval` dependency group, so the runtime
+  dependency list from the plan is unchanged and `uv sync` does not install it.
+- **Not run in this repository yet.** No API key was available while building it; the harness is
+  covered by offline tests with a scripted model, and the live thresholds (search ≥ 90%,
+  judge-correct ≥ 80%, hallucination ≤ 10%) are a starting bar to re-pin after the first runs.
+
 ## Not done (would do next)
 
-- A model-in-the-loop routing eval: the same needs sent to Claude (Haiku 5.5 first), scoring tool
-  choice, search terms and the skill picked.
+- Running the agentic eval regularly (it needs an API key, so it is opt-in today) and re-pinning
+  its thresholds from measured runs.
+- Per-tool-call structured logs in the MCP adapter and catalog-side product signals (DESIGN D9).
 - A session-start nudge (e.g. a Claude Code hook running a `skills check` command) so an agent
   learns its procedural memory is stale before using it, not only when asked.
 - Garbage collection of orphaned blobs; deprecate/yank; ownership and authentication.

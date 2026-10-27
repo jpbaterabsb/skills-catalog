@@ -212,6 +212,18 @@ the first problem that appears at scale, but they need ownership, which needs au
 The MCP Python SDK v2 renamed `FastMCP` to `MCPServer` and targets a new protocol revision. Pinned
 to `mcp>=1.27,<2` for a stable, well-documented API during the time box; migration is a Phase 2 item.
 
+**D9. Observability: the agent traces the agent, the catalog measures the catalog.**
+Step-by-step tracing of an agent (prompts, reasoning, tool calls, latency per step) belongs to the
+harness that runs the loop: Claude Code can export OpenTelemetry telemetry, and tools like Langfuse
+sit on that side. The catalog is a tool provider; it only sees the calls made to it, without the
+prompts that make a trace useful, so embedding an LLM-tracing SDK in the MCP server would duplicate
+the agent's traces with less context. What only the catalog can produce are **product signals**:
+no-result search rate, installs per skill, outdated and locally modified installs. Those are
+plain metrics and structured logs, not LLM traces. MVP: structured logs on the API (`publish`
+logs name, version, digest) and full JSONL traces for every eval run (`.eval-runs/`), which is
+where this project runs its own agent loop. Phase 2: per-tool-call structured logs in the adapter
+(tool, duration, error, output size) and the product signals above.
+
 ## 9. Threat model (scoped)
 
 Authentication is out of scope per the PRD. Integrity and safety are not the same thing as
@@ -263,6 +275,15 @@ agent with tools will follow, and may ship executable `scripts/`.
   step adds to the context (Section 6). Tests enforce the contract (one bounded line per search
   result, no supporting file contents, one-line install) rather than exact numbers.
 - `uv run python -m tests.eval.report` prints both evals as Markdown.
+- **Agentic eval with an LLM judge** (`tests/eval/agentic.py`): measures the reformulation the two
+  evals above assume. Each need goes to Claude Haiku 5.5 in a tool loop over the real MCP server;
+  every step is recorded. Code-graded checks read the trace (searched? first search ranked the
+  right skill first?); an LLM judge (Claude Opus 5.5, JSON-schema output) grades the final answer
+  for the right skill or a clear "none fits", and for invented skills or capabilities. The judge is
+  calibrated against seven hand-labelled traces before its verdicts count, and a judge refusal
+  fails the run instead of silently switching judge models. Opt-in because it calls the API
+  (`uv run --group eval python -m tests.eval.agentic`, key in `.env`); its harness is covered offline
+  with a scripted model.
 
 ## 12. Build plan (time box)
 
@@ -288,10 +309,9 @@ verification, versioning, tests.
 1. **Ownership + authentication.** Without it, anyone can publish a new version of anyone's skill.
    This is the largest risk to the "single source of truth" goal.
 2. **Update notifications and upgrade flow.** Pinning without a nudge recreates drift slowly.
-3. **Model-in-the-loop routing eval.** Run the discovery needs through a real model (Claude
-   Haiku 5.5 first, the cheapest that must still work) and score whether it calls `search_skills`,
-   which terms it sends and whether it picks the right skill. The current eval fixes the query;
-   this one measures the reformulation the design relies on.
+3. **Run the agentic eval in CI and pin its thresholds.** The harness exists (Section 11); next
+   is running it on a schedule with a CI secret, re-pinning thresholds from measured runs, and
+   growing the cases from real no-result searches (item 4).
 4. **Usage signals.** Installs per skill, no-result search rate, outdated-install rate.
 5. **Agent-proposed versions (memory consolidation).** An agent that solved a task well proposes a
    new skill or version from what it learned; a human approves before it becomes latest. This turns
