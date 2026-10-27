@@ -24,8 +24,9 @@ if [[ -e "$TARGET" && ! -e "$TARGET/$MARKER" ]]; then
 fi
 if [[ $RESET == 1 && -e "$TARGET" ]]; then
   if [[ -f "$TARGET/catalog-data/api.pid" ]]; then
-    kill "$(cat "$TARGET/catalog-data/api.pid")" 2>/dev/null || true
-    sleep 0.5
+    pid="$(cat "$TARGET/catalog-data/api.pid")"
+    kill "$pid" 2>/dev/null || true
+    for _ in $(seq 1 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
   fi
   rm -rf "$TARGET"
 fi
@@ -38,11 +39,20 @@ TARGET="$(cd "$TARGET" && pwd)"
 # 1. The shared catalog (what would be a team server in real life).
 if healthy; then
   echo "Using the catalog already running at $SKILLS_CATALOG_URL"
+elif curl -sS -o /dev/null "$SKILLS_CATALOG_URL/health" 2>/dev/null; then
+  echo "error: something at $SKILLS_CATALOG_URL answers but is not a healthy catalog:" >&2
+  curl -sS "$SKILLS_CATALOG_URL/health" >&2 || true
+  echo >&2
+  echo "Stop it (lsof -nP -iTCP:${SKILLS_CATALOG_URL##*:} -sTCP:LISTEN) and rerun." >&2
+  exit 1
 else
   mkdir -p "$TARGET/catalog-data"
-  (cd "$REPO" && SKILLS_CATALOG_DATA="$TARGET/catalog-data" \
-    nohup uv run skills-catalog-api >"$TARGET/catalog-data/api.log" 2>&1 &
-    echo $! >"$TARGET/catalog-data/api.pid")
+  # Run the server executable itself (not `uv run`), so the saved PID is the process that
+  # listens on the port and `--reset` really stops it.
+  API_BIN="$(cd "$REPO" && uv run --quiet python -c \
+    'import os, sys; print(os.path.join(os.path.dirname(sys.executable), "skills-catalog-api"))')"
+  SKILLS_CATALOG_DATA="$TARGET/catalog-data" nohup "$API_BIN" >"$TARGET/catalog-data/api.log" 2>&1 &
+  echo $! >"$TARGET/catalog-data/api.pid"
   for _ in $(seq 1 50); do healthy && break; sleep 0.2; done
   healthy || { echo "catalog failed to start; see $TARGET/catalog-data/api.log" >&2; exit 1; }
   echo "Started the catalog at $SKILLS_CATALOG_URL (data: $TARGET/catalog-data)"

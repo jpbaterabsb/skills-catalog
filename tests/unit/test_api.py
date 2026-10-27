@@ -25,6 +25,15 @@ def test_health(client):
     assert client.get("/health").json() == {"status": "ok"}
 
 
+def test_health_fails_when_the_data_directory_is_gone(client, tmp_path):
+    import shutil
+
+    shutil.rmtree(tmp_path / "data")
+    response = client.get("/health")
+    assert response.status_code == 503
+    assert response.json()["status"] == "unavailable"
+
+
 def test_publish_returns_201_then_200_for_identical_republish(client):
     files = bundle("my-skill", bin=b"\x00\xff")
     first = publish(client, files)

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
 from . import search as _search
 from .digest import bundle_digest, file_sha256
-from .errors import SkillNotFoundError, VersionNotFoundError
+from .errors import CatalogError, SkillNotFoundError, VersionNotFoundError
 from .models import FileEntry, PublishResult, SearchResult, SkillVersion, VersionSummary
 from .store import BlobStore, Store
 from .validation import SKILL_FILE, validate_bundle
@@ -129,6 +130,16 @@ class CatalogService:
 
     def read_blob(self, sha256: str) -> bytes:
         return self.blobs.get(sha256)
+
+    def check_health(self) -> None:
+        """Raise if the catalog cannot serve requests (database or blob store unusable)."""
+        if not self.blobs.root.is_dir():
+            raise CatalogError(f"blob directory {self.blobs.root} is missing")
+        try:
+            with self.store.read() as conn:
+                conn.execute("SELECT count(*) FROM versions").fetchone()
+        except sqlite3.Error as exc:
+            raise CatalogError(f"database {self.store.db_path} is unusable: {exc}") from exc
 
     @staticmethod
     def _exists(conn, name: str) -> bool:

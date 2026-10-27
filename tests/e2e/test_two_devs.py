@@ -7,9 +7,10 @@ import json
 import os
 import shutil
 import subprocess
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
+import httpx
 import pytest
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -111,3 +112,41 @@ def test_refuses_to_reuse_a_foreign_folder(tmp_path, catalog_url):
         env={**os.environ, "SKILLS_CATALOG_URL": catalog_url},
     )
     assert result.returncode == 1 and "not created by this script" in result.stderr
+
+
+def run_setup(target: Path, url: str, *extra: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [str(REPO / "scripts" / "two-devs.sh"), *extra, str(target)],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "SKILLS_CATALOG_URL": url},
+    )
+
+
+def test_refuses_to_reuse_an_unhealthy_catalog(tmp_path, catalog_url):
+    shutil.rmtree(tmp_path / "data")  # the running catalog's data directory disappears
+    result = run_setup(tmp_path / "demo", catalog_url)
+    assert result.returncode == 1
+    assert "not a healthy catalog" in result.stderr
+
+
+def test_reset_stops_the_catalog_it_started(tmp_path):
+    from tests.e2e.conftest import free_port
+
+    url = f"http://127.0.0.1:{free_port()}"
+    target = tmp_path / "demo"
+    assert run_setup(target, url).returncode == 0
+    pid = int((target / "catalog-data" / "api.pid").read_text())
+    try:
+        assert httpx.get(f"{url}/health", timeout=2).json() == {"status": "ok"}
+        assert run_setup(target, url, "--reset").returncode == 0
+        # --reset stopped the old server and the rerun started a fresh one with a new PID.
+        new_pid = int((target / "catalog-data" / "api.pid").read_text())
+        assert new_pid != pid
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
+        assert httpx.get(f"{url}/health", timeout=2).json() == {"status": "ok"}
+    finally:
+        for p in {pid, int((target / "catalog-data" / "api.pid").read_text())}:
+            with suppress(ProcessLookupError):
+                os.kill(p, 15)

@@ -14,10 +14,16 @@ uv sync --quiet
 
 if healthy; then
   echo "Catalog already running at $SKILLS_CATALOG_URL"
+elif curl -sS -o /dev/null "$SKILLS_CATALOG_URL/health" 2>/dev/null; then
+  echo "error: $SKILLS_CATALOG_URL answers but is not a healthy catalog:" >&2
+  curl -sS "$SKILLS_CATALOG_URL/health" >&2 || true
+  echo >&2
+  exit 1
 else
   mkdir -p "$SKILLS_CATALOG_DATA"
   echo "Starting catalog at $SKILLS_CATALOG_URL (log: $SKILLS_CATALOG_DATA/api.log)"
-  nohup uv run skills-catalog-api >"$SKILLS_CATALOG_DATA/api.log" 2>&1 &
+  # The server executable itself, not `uv run`, so api.pid is the process to stop.
+  nohup .venv/bin/skills-catalog-api >"$SKILLS_CATALOG_DATA/api.log" 2>&1 &
   echo $! >"$SKILLS_CATALOG_DATA/api.pid"
   for _ in $(seq 1 50); do healthy && break; sleep 0.2; done
   healthy || { echo "catalog failed to start; see $SKILLS_CATALOG_DATA/api.log" >&2; exit 1; }

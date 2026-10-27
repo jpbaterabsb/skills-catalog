@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from .. import config
-from ..core.errors import NotFoundError, ValidationError
+from ..core.errors import CatalogError, NotFoundError, ValidationError
 from ..core.search import DEFAULT_LIMIT, MAX_LIMIT
 from ..core.service import CatalogService
 
@@ -63,8 +63,14 @@ def create_app(data_dir: Path | None = None) -> FastAPI:
         return JSONResponse({"error": str(exc)}, status_code=404)
 
     @app.get("/health")
-    def health() -> dict:
-        return {"status": "ok"}
+    def health() -> JSONResponse:
+        # Touches the database and blob store, so a catalog whose data directory disappeared
+        # reports itself unhealthy instead of answering "ok" and failing every real request.
+        try:
+            service.check_health()
+        except CatalogError as exc:
+            return JSONResponse({"status": "unavailable", "error": str(exc)}, status_code=503)
+        return JSONResponse({"status": "ok"})
 
     @app.post("/skills")
     def publish(body: PublishRequest) -> JSONResponse:
