@@ -1,5 +1,7 @@
 # Skills Catalog
 
+[![CI](https://github.com/jpbaterabsb/skills-catalog/actions/workflows/ci.yml/badge.svg)](https://github.com/jpbaterabsb/skills-catalog/actions/workflows/ci.yml)
+
 **Author:** Joao Paulo Oliveira Santos
 
 A shared, versioned catalog of [Agent Skills](https://agentskills.io/specification): developers
