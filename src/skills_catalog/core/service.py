@@ -8,9 +8,10 @@ from pathlib import Path
 
 from . import search as _search
 from .digest import bundle_digest, file_sha256
-from .models import FileEntry, PublishResult, SearchResult
+from .errors import SkillNotFoundError, VersionNotFoundError
+from .models import FileEntry, PublishResult, SearchResult, SkillVersion, VersionSummary
 from .store import BlobStore, Store
-from .validation import validate_bundle
+from .validation import SKILL_FILE, validate_bundle
 
 
 def utc_now() -> str:
@@ -75,3 +76,60 @@ class CatalogService:
         """Find skills by name and description. Never returns skill bodies."""
         with self.store.read() as conn:
             return _search.search(conn, query, limit)
+
+    def get(self, name: str, version: int | None = None) -> SkillVersion:
+        """Return one version (the latest when ``version`` is None) with its ``SKILL.md`` text."""
+        with self.store.read() as conn:
+            if version is None:
+                row = conn.execute(
+                    "SELECT * FROM versions WHERE name = ? ORDER BY version DESC LIMIT 1", (name,)
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT * FROM versions WHERE name = ? AND version = ?", (name, version)
+                ).fetchone()
+            if row is None:
+                if version is None or not self._exists(conn, name):
+                    raise SkillNotFoundError(name)
+                raise VersionNotFoundError(name, version)
+            files = tuple(
+                FileEntry(r["path"], r["sha256"], r["size"])
+                for r in conn.execute(
+                    "SELECT path, sha256, size FROM version_files "
+                    "WHERE name = ? AND version = ? ORDER BY path",
+                    (name, row["version"]),
+                )
+            )
+        skill_md_sha = next(f.sha256 for f in files if f.path == SKILL_FILE)
+        return SkillVersion(
+            name=row["name"],
+            version=row["version"],
+            digest=row["digest"],
+            description=row["description"],
+            published_by=row["published_by"],
+            published_at=row["published_at"],
+            skill_md=self.blobs.get(skill_md_sha).decode("utf-8"),
+            files=files,
+        )
+
+    def history(self, name: str) -> list[VersionSummary]:
+        """All versions of a skill, newest first."""
+        with self.store.read() as conn:
+            rows = conn.execute(
+                "SELECT version, digest, published_by, published_at FROM versions "
+                "WHERE name = ? ORDER BY version DESC",
+                (name,),
+            ).fetchall()
+        if not rows:
+            raise SkillNotFoundError(name)
+        return [
+            VersionSummary(r["version"], r["digest"], r["published_by"], r["published_at"])
+            for r in rows
+        ]
+
+    def read_blob(self, sha256: str) -> bytes:
+        return self.blobs.get(sha256)
+
+    @staticmethod
+    def _exists(conn, name: str) -> bool:
+        return conn.execute("SELECT 1 FROM skills WHERE name = ?", (name,)).fetchone() is not None
