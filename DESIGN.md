@@ -127,6 +127,9 @@ human-readable reason, so the assistant can say "not found" clearly (UC-02, UC-0
 **Memory-management principle:** the catalog follows the same progressive disclosure the Agent
 Skills spec uses. Discovery costs ~one line per skill; the body enters context only when the agent
 decides it needs it; supporting files reach the disk without ever entering the context window.
+Measured on the real tool outputs (Section 11): five search results cost about 240 tokens,
+`get_skill` about 485 for `incident-postmortem`, and its 172 tokens of supporting files never enter
+the context. Discovery cost grows with the number of results, not with the size of the catalog.
 
 ## 7. Memory lifecycle
 
@@ -194,6 +197,10 @@ row in one transaction. A malformed publish leaves existing versions untouched (
 The assistant already performs semantic reformulation of the user's need; the catalog only needs
 a cheap, deterministic index over name + description. Embeddings add a model dependency, cost and
 non-determinism for little gain at this scale. Revisit when no-result rate is measurably high.
+The discovery eval (Section 11) quantifies the trade-off: with the key terms the tool asks for,
+recall is 100% at rank 1; with a sentence passed verbatim it drops to 89%, and the misses are
+exactly the synonym cases embeddings would fix ("why we chose Kafka over SQS" vs. "Architecture
+Decision Record").
 This mirrors Anthropic's own memory direction: explicit, file-based, inspectable memory with active
 context management rather than an opaque vector store.
 
@@ -225,7 +232,7 @@ agent with tools will follow, and may ship executable `scripts/`.
 | Requirement | Implementation | Verified by |
 |---|---|---|
 | FR-01 Publish | `publish_skill`, CLI `publish`, validation in `core` | Unit: valid publish; every rejection rule, all errors reported together, nothing stored (`test_validation`, `test_publish`) |
-| FR-02 Discover | `search_skills` over FTS5 | Unit: match / no match / special characters / limit (`test_search`); E2E search by need. Eval set (Section 11) not built yet |
+| FR-02 Discover | `search_skills` over FTS5 | Unit: match / no match / special characters / limit (`test_search`); E2E search by need; discovery eval, 22 cases (`tests/eval`) |
 | FR-03 Retrieve | `get_skill`, `install_skill` | Unit: byte-identical install, corrupted blob leaves nothing (`test_installer`); E2E: publish → install → trees equal; not found |
 | FR-04 Version | immutable versions, `list_versions`, `version` param, `check_updates` | Unit: republish creates v2, v1 retrievable, history shows both, concurrent publishes (`test_publish`, `test_retrieve`, `test_concurrency`); update states (`test_updates`); E2E outdated → locally modified → force |
 | NFR Consistency | Section 4 invariant | Byte comparison of original vs installed tree, incl. binary and CRLF files (E2E) |
@@ -238,10 +245,24 @@ agent with tools will follow, and may ship executable `scripts/`.
 - **End-to-end:** start API, drive the MCP adapter with the MCP SDK client, publish → search →
   install → compare trees byte-for-byte → republish → `check_updates` reports outdated → modify a
   file locally → `check_updates` reports locally modified.
-- **Discovery eval (small, not built yet):** ~10 natural-language needs with the expected skill (or "none"),
-  e.g. "is there something to help write release notes?" → `release-note-draft`. Measures whether
-  tool descriptions + skill descriptions route correctly. This is the cheapest leading indicator of
-  whether the memory is actually *recallable*.
+- **Discovery eval** (`tests/eval`): is the memory actually *recallable*? A 12-skill catalog with
+  deliberately overlapping skills and 22 developer needs (3 with no right answer), each scored with
+  the key terms an assistant sends and with the sentence verbatim as a lower bound:
+
+  | Search input | hit@1 | hit@3 | MRR | no-match correct |
+  |---|---|---|---|---|
+  | Key terms (what `search_skills` asks for) | 100% | 100% | 1.00 | 100% |
+  | Developer's sentence, verbatim | 89% | 95% | 0.92 | 67% |
+
+  The eval earned its keep immediately: verbatim no-match accuracy was first 0%, because function
+  words such as "the" or "our" matched every description. Filtering them fixed it without changing
+  keyword results. The tests pin these values as regression guards. Caveat: the key-term queries
+  were written by the author, so that row is an upper bound; routing through a real model is the
+  next eval (Section 13).
+- **Context-budget eval** (`tests/eval`): drives the real MCP tools and estimates the tokens each
+  step adds to the context (Section 6). Tests enforce the contract (one bounded line per search
+  result, no supporting file contents, one-line install) rather than exact numbers.
+- `uv run python -m tests.eval.report` prints both evals as Markdown.
 
 ## 12. Build plan (time box)
 
@@ -267,20 +288,25 @@ verification, versioning, tests.
 1. **Ownership + authentication.** Without it, anyone can publish a new version of anyone's skill.
    This is the largest risk to the "single source of truth" goal.
 2. **Update notifications and upgrade flow.** Pinning without a nudge recreates drift slowly.
-3. **Usage signals.** Installs per skill, no-result search rate, outdated-install rate.
-4. **Agent-proposed versions (memory consolidation).** An agent that solved a task well proposes a
+3. **Model-in-the-loop routing eval.** Run the discovery needs through a real model (Claude
+   Haiku 5.5 first, the cheapest that must still work) and score whether it calls `search_skills`,
+   which terms it sends and whether it picks the right skill. The current eval fixes the query;
+   this one measures the reformulation the design relies on.
+4. **Usage signals.** Installs per skill, no-result search rate, outdated-install rate.
+5. **Agent-proposed versions (memory consolidation).** An agent that solved a task well proposes a
    new skill or version from what it learned; a human approves before it becomes latest. This turns
    episodic experience into shared procedural memory, with a human gate against memory poisoning.
-5. **Deprecate / yank** (the "forget" phase of the lifecycle).
-6. **Namespaces**, then **semantic or hybrid search** if the no-result rate justifies it,
+6. **Deprecate / yank** (the "forget" phase of the lifecycle).
+7. **Namespaces**, then **semantic or hybrid search** if the no-result rate justifies it,
    then **de-duplication** of near-identical skills.
-7. **MCP SDK v2 migration** and a remote Streamable HTTP option for clients that cannot run stdio.
+8. **MCP SDK v2 migration** and a remote Streamable HTTP option for clients that cannot run stdio.
 
 ## 14. Known limitations
 
 - No auth, no ownership (by design, PRD D3).
 - Global namespace; collisions are first-come.
-- Lexical search misses synonyms that the agent doesn't reformulate.
+- Lexical search misses synonyms that the agent doesn't reformulate (measured: 89% hit@1 for
+  verbatim sentences vs. 100% for reformulated key terms).
 - This catalog solves *procedural, cross-agent* memory. It does **not** address working memory
   inside a long session (context editing, compaction) or per-user episodic memory; those are
   different systems with different trade-offs.

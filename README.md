@@ -7,6 +7,19 @@ publish a skill once and anyone's AI assistant can find, read and install it ove
 What was published is byte for byte what gets installed, and every project can tell whether its
 copy is still current (`skills.lock` + `check_updates`).
 
+**Why it matters for agent memory.** A skill is an agent's *procedural memory*: how this team does
+a task. Copied by hand, every developer's agent ends up with its own drifting version. The catalog
+treats that memory with the three properties it needs, and each one is measured, not just claimed:
+
+| Memory property | Mechanism | Evidence |
+|---|---|---|
+| **Shared**: one source of truth | Immutable versions in one catalog; publish from any session | Two-session demo; concurrent-publish test |
+| **Recallable** on demand, without preloading | Search over name and description; body only on request; files straight to disk | Discovery eval: hit@1 100% with key terms; ~240 tokens for 5 results ([Evidence](#evidence)) |
+| **Consistent** over time | Content digests, verified installs, `skills.lock`, drift detection | Byte-identical installs; `outdated` / `locally modified` states in E2E |
+
+The reasoning behind it, including which memory problems this does *not* solve, is in
+[DESIGN.md §1 and §15](DESIGN.md).
+
 ## Try it: two developers, two Claude Code sessions
 
 Requires [uv](https://docs.astral.sh/uv/) and [Claude Code](https://code.claude.com) (`claude`).
@@ -62,6 +75,40 @@ uv run ruff check . && uv run ruff format --check .
 The end-to-end tests include the two-developer demo itself: `tests/e2e/test_two_devs.py` runs
 `scripts/two-devs.sh` and launches each generated `.mcp.json` the way Claude Code does.
 
+## Evidence
+
+Two evals back the memory claims. They run with the test suite (as regression guards) and
+`uv run python -m tests.eval.report` prints the tables below.
+
+**Is the memory recallable?** A 12-skill catalog with deliberately overlapping skills (release
+notes vs. commit messages vs. PR descriptions; postmortem vs. on-call handoff vs. error triage) and
+22 developer needs, 3 of which have no right answer
+([tests/eval/cases.py](tests/eval/cases.py)):
+
+| Search input | hit@1 | hit@3 | MRR | no-match correct |
+|---|---|---|---|---|
+| Key terms (what `search_skills` asks the model to send) | 100% | 100% | 1.00 | 100% |
+| Developer's sentence, verbatim (lower bound) | 89% | 95% | 0.92 | 67% |
+
+The verbatim run is the worst case for a model that does not reformulate. Its misses are the known
+limits of lexical search: "Document why we chose Kafka over SQS" shares no word with "Architecture
+Decision Record", and "PDF invoices for our customers" overlaps with `customer-bug-report`. This
+eval also found a bug: before function words were filtered, verbatim no-match accuracy was 0%,
+because "the" or "our" matched every skill.
+
+**What does recall cost in context?** Real MCP tool outputs, tokens estimated as characters / 4:
+
+| What enters the model's context | Tokens |
+|---|---|
+| `search_skills`, 5 results (one line each) | ~240 |
+| `get_skill incident-postmortem` (SKILL.md + file list) | ~485 |
+| `install_skill incident-postmortem` (one confirmation line) | ~60 |
+| Supporting files, written to disk and never put in context | 172 |
+| `incident-postmortem` with every file inlined | 596 |
+
+Discovery cost depends on the number of results, not on the size of the catalog: preloading
+100 skills like the examples would take about 50,000 tokens, while a search stays at five lines.
+
 ---
 
 ## How it works
@@ -101,7 +148,8 @@ src/skills_catalog/
   adapter/   HTTP client, installer (+ update checks), lockfile, MCP server
   cli.py
 examples/    release-note-draft, incident-postmortem skills
-tests/       unit/ (core, API, CLI, adapter, MCP in memory), e2e/ (real processes)
+tests/       unit/ (core, API, CLI, adapter, MCP in memory), e2e/ (real processes),
+             eval/ (discovery and context-budget evals)
 scripts/     two-devs.sh (Claude Code demo), demo.sh (CLI demo)
 docs/        demo.md, NOTES.md
 ```

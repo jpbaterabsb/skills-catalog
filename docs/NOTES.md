@@ -16,7 +16,11 @@ plan. Each entry says why.
 1. **FTS5 tokenizer: `porter unicode61`** instead of the default. The schema in the plan was
    `fts5(name, description)`; stemming makes "release note" find "release notes" and "migration"
    find "migrations" at no cost in determinism. Everything else about search (sanitized, quoted,
-   OR-ed tokens, `bm25` order, default 5, max 20) is as specified.
+   OR-ed tokens, `bm25` order, default 5, max 20) is as specified, plus the stopword filter below.
+7. **Function words are dropped from search queries.** The plan's sanitizer kept every `\w+`
+   token. The discovery eval showed that, with OR semantics, a sentence passed verbatim never
+   returned "no match" because "the" or "our" occur in every description. A short stopword list
+   (`core/search.py`) fixed it: verbatim no-match accuracy 0% → 67%, keyword results unchanged.
 2. **The HTTP client landed before the CLI.** The plan put `feat(adapter): add http client` in M3,
    after the CLI in M2. The CLI publishes through the API, so writing the client first avoided a
    second, throwaway HTTP layer.
@@ -108,7 +112,29 @@ plan. Each entry says why.
   HTTP 500, and the setup script reused it. Fixed by making `/health` check storage and by
   saving the server's own PID so `--reset` really stops it (both covered by E2E tests).
 
+## Evals
+
+- **Why evals at all.** "The memory is recallable" and "recall is cheap in context" were design
+  claims. `tests/eval` turns both into numbers (`uv run python -m tests.eval.report`) and pins them
+  as regression guards in the normal test run, so a change to search or tool output that hurts
+  recall or bloats context fails CI.
+- **Discovery eval design.** 12 skills chosen to overlap (three writing-about-changes skills, three
+  incident skills) so ranking is actually tested; 22 needs, 3 with no right answer, because "no
+  match" is as important as a hit (UC-02). Each need is scored twice: with the key terms an
+  assistant sends (what `search_skills` asks for) and with the sentence verbatim as a lower bound.
+- **Honest caveat.** The key-term queries were written by the author, who knew the descriptions;
+  treat that 100% as an upper bound. The verbatim row and its documented misses are the more
+  informative numbers. The missing piece is a model-in-the-loop eval (DESIGN §13).
+- **Token estimate.** Characters / 4, to avoid adding a tokenizer dependency. Good enough to
+  compare steps with each other; not a billing figure.
+- **What the budget tests enforce.** The contract, not exact counts: one bounded line per search
+  result, `get_skill` without supporting file contents, a one-line install confirmation, and each
+  step cheaper than inlining the skill.
+
 ## Not done (would do next)
 
-- The ~10-query discovery eval from DESIGN §11, run through a model, to measure routing.
+- A model-in-the-loop routing eval: the same needs sent to Claude (Haiku 5.5 first), scoring tool
+  choice, search terms and the skill picked.
+- A session-start nudge (e.g. a Claude Code hook running a `skills check` command) so an agent
+  learns its procedural memory is stale before using it, not only when asked.
 - Garbage collection of orphaned blobs; deprecate/yank; ownership and authentication.
