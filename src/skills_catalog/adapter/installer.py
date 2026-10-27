@@ -14,7 +14,9 @@ from pathlib import Path
 
 from ..core.digest import digest_files, file_sha256
 from ..core.errors import CatalogError, ValidationError
+from ..core.service import utc_now
 from ..core.validation import NAME_PATTERN, read_skill_dir, validate_bundle
+from . import lockfile
 from .client import CatalogClient
 
 
@@ -84,6 +86,11 @@ def install(
         _swap_into_place(staging, target)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
+
+    lock = lockfile.load(project_root, client.base_url)
+    lock.catalog = client.base_url
+    lock.skills[name] = lockfile.LockEntry(resolved_version, digest, utc_now())
+    lockfile.save(project_root, lock)
     return InstallResult(name, resolved_version, digest, target)
 
 
