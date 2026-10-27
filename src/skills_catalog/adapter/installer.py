@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..core.digest import digest_files, file_sha256
-from ..core.errors import CatalogError, ValidationError
+from ..core.errors import CatalogError, NotFoundError, ValidationError
 from ..core.service import utc_now
 from ..core.validation import NAME_PATTERN, read_skill_dir, validate_bundle
 from . import lockfile
@@ -22,6 +22,16 @@ from .client import CatalogClient
 
 class IntegrityError(CatalogError):
     """Downloaded content does not match what the catalog says it published."""
+
+
+class LocallyModifiedError(CatalogError):
+    def __init__(self, name: str, path: Path) -> None:
+        self.name = name
+        self.path = path
+        super().__init__(
+            f"{name} is locally modified at {path} (its files no longer match skills.lock); "
+            "re-run with force=true to overwrite the local changes"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,13 +79,29 @@ def download(client: CatalogClient, name: str, version: int | None) -> tuple[int
 
 
 def install(
-    client: CatalogClient, project_root: Path, name: str, version: int | None = None
+    client: CatalogClient,
+    project_root: Path,
+    name: str,
+    version: int | None = None,
+    *,
+    force: bool = False,
 ) -> InstallResult:
+    """Install ``name`` (latest unless ``version``) and record it in ``skills.lock``.
+
+    An existing directory whose files match neither the lockfile nor the version being installed
+    holds local edits (or was copied by hand); it is only overwritten when ``force`` is set.
+    """
+    lock = lockfile.load(project_root, client.base_url)
     resolved_version, digest, files = download(client, name, version)
 
     parent = skills_dir(project_root)
-    parent.mkdir(parents=True, exist_ok=True)
     target = parent / name
+    if target.exists() and not force:
+        current = local_digest(target)
+        locked = lock.skills.get(name)
+        if current != digest and (locked is None or current != locked.digest):
+            raise LocallyModifiedError(name, target)
+    parent.mkdir(parents=True, exist_ok=True)
 
     # Staging directory next to the target: same filesystem, so the final rename is atomic.
     staging = Path(tempfile.mkdtemp(dir=parent, prefix=f".{name}.tmp-"))
@@ -87,7 +113,6 @@ def install(
     finally:
         shutil.rmtree(staging, ignore_errors=True)
 
-    lock = lockfile.load(project_root, client.base_url)
     lock.catalog = client.base_url
     lock.skills[name] = lockfile.LockEntry(resolved_version, digest, utc_now())
     lockfile.save(project_root, lock)
@@ -123,3 +148,60 @@ def _swap_into_place(staging: Path, target: Path) -> None:
         os.replace(backup, target)
         raise
     shutil.rmtree(backup, ignore_errors=True)
+
+
+UP_TO_DATE = "up to date"
+OUTDATED = "outdated"
+LOCALLY_MODIFIED = "locally modified"
+MISSING_ON_DISK = "missing on disk"
+NOT_IN_CATALOG = "not in catalog"
+
+
+@dataclass(frozen=True, slots=True)
+class UpdateStatus:
+    name: str
+    state: str
+    installed_version: int
+    latest_version: int | None
+
+    def describe(self) -> str:
+        installed, latest = self.installed_version, self.latest_version
+        if self.state == OUTDATED:
+            return f"{self.name}: outdated (v{installed} → v{latest})"
+        if self.state == UP_TO_DATE:
+            return f"{self.name}: up to date (v{installed})"
+        if self.state == LOCALLY_MODIFIED:
+            tail = f"; catalog latest v{latest}" if latest is not None else ""
+            return f"{self.name}: locally modified (installed v{installed}{tail})"
+        if self.state == MISSING_ON_DISK:
+            return f"{self.name}: missing on disk (locked at v{installed})"
+        return f"{self.name}: {self.state} (locked at v{installed})"
+
+
+def check_updates(client: CatalogClient, project_root: Path) -> list[UpdateStatus]:
+    """Compare disk, lockfile and catalog for every skill in ``skills.lock``.
+
+    - disk != lock               -> locally modified (silent drift, now visible)
+    - lock version < latest      -> outdated
+    - otherwise                  -> up to date
+    """
+    lock = lockfile.load(project_root, client.base_url)
+    statuses = []
+    for name, entry in sorted(lock.skills.items()):
+        try:
+            latest = client.get(name).version
+        except NotFoundError:
+            latest = None
+        target = skills_dir(project_root) / name
+        if not target.is_dir():
+            state = MISSING_ON_DISK
+        elif local_digest(target) != entry.digest:
+            state = LOCALLY_MODIFIED
+        elif latest is None:
+            state = NOT_IN_CATALOG
+        elif latest > entry.version:
+            state = OUTDATED
+        else:
+            state = UP_TO_DATE
+        statuses.append(UpdateStatus(name, state, entry.version, latest))
+    return statuses

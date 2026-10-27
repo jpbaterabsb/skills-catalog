@@ -110,6 +110,8 @@ def test_unknown_skill(catalog_client, project):
 class EvilCatalog:
     """A catalog that serves a path-traversal bundle with correct hashes."""
 
+    base_url = "http://evil"
+
     def __init__(self, files):
         from skills_catalog.core.digest import digest_files
         from skills_catalog.core.models import FileEntry, SkillVersion
